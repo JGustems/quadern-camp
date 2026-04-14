@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
 import MapaCamp from './MapaCamp.jsx'
+import FormulariTasca from './FormulariTasca.jsx'
 
 export default function App() {
   const [pobles, setPobles] = useState([])
@@ -9,6 +10,7 @@ export default function App() {
   const [pobleSeleccionat, setPobleSeleccionat] = useState(null)
   const [campSeleccionat, setCampSeleccionat] = useState(null)
   const [zonesSeleccionades, setZonesSeleccionades] = useState([])
+  const [mostrarFormulari, setMostrarFormulari] = useState(false)
   const [carregant, setCarregant] = useState(true)
 
   useEffect(() => { carregaPobles() }, [])
@@ -46,12 +48,12 @@ export default function App() {
   }
 
   function seleccionaFila(fila) {
-    const zonesFilа = zones.filter(z => z.fila === fila && !z.es_permanent)
+    const zonesFila = zones.filter(z => z.fila === fila && !z.es_permanent)
     setZonesSeleccionades(prev => {
-      const jaHiSon = zonesFilа.every(z => prev.find(p => p.id === z.id))
+      const jaHiSon = zonesFila.every(z => prev.find(p => p.id === z.id))
       if (jaHiSon) return prev.filter(z => z.fila !== fila)
       const sense = prev.filter(z => z.fila !== fila)
-      return [...sense, ...zonesFilа]
+      return [...sense, ...zonesFila]
     })
   }
 
@@ -67,6 +69,10 @@ export default function App() {
     const codis = zonesSeleccionades.map(z => z.codi).sort()
     if (codis.length > 6) return `${codis.length} zones seleccionades`
     return `Zones: ${codis.join(', ')}`
+  }
+
+  function campAmbPoble() {
+    return { ...campSeleccionat, poble: pobleSeleccionat }
   }
 
   if (carregant) return (
@@ -132,7 +138,8 @@ export default function App() {
               <div style={styles.panellTitol}>Selecció</div>
               <div style={styles.resumSeleccio}>{resumSeleccio()}</div>
 
-              <button style={styles.boto} onClick={() => alert('Formulari de tasca — proper pas!')}>
+              <button style={styles.boto}
+                onClick={() => setMostrarFormulari(true)}>
                 + Nova tasca
               </button>
               <button style={{...styles.boto, ...styles.botoSecundari}}
@@ -167,6 +174,18 @@ export default function App() {
           </div>
         )}
       </div>
+
+      {mostrarFormulari && (
+        <FormulariTasca
+          zones={zonesSeleccionades}
+          camp={campAmbPoble()}
+          onTancar={() => setMostrarFormulari(false)}
+          onGuardat={() => {
+            setMostrarFormulari(false)
+            setZonesSeleccionades([])
+          }}
+        />
+      )}
     </div>
   )
 }
