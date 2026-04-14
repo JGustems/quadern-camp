@@ -91,12 +91,12 @@ export default function FormulariTasca({ zones, camp, onTancar, onGuardat }) {
     setCarregantTemps(false)
   }
 
-  function obtenirCoordenades() {
+function obtenirCoordenades() {
     const coords = {
-      'All': { lat: 41.47, lon: 1.52 },
-      'Begues': { lat: 41.33, lon: 1.88 },
-      'Estoll': { lat: 41.55, lon: 1.48 },
-      'Alp': { lat: 42.40, lon: 1.88 },
+      'All': { lat: 41.4731, lon: 1.5189 },
+      'Begues': { lat: 41.3397, lon: 1.8731 },
+      'Estoll': { lat: 41.5578, lon: 1.4889 },
+      'Alp': { lat: 42.3718, lon: 1.8843 },
     }
     return coords[camp?.poble?.nom] || { lat: 41.38, lon: 2.17 }
   }
