@@ -8,7 +8,7 @@ export default function App() {
   const [zones, setZones] = useState([])
   const [pobleSeleccionat, setPobleSeleccionat] = useState(null)
   const [campSeleccionat, setCampSeleccionat] = useState(null)
-  const [zonaSeleccionada, setZonaSeleccionada] = useState(null)
+  const [zonesSeleccionades, setZonesSeleccionades] = useState([])
   const [carregant, setCarregant] = useState(true)
 
   useEffect(() => { carregaPobles() }, [])
@@ -23,7 +23,7 @@ export default function App() {
     setPobleSeleccionat(poble)
     setCampSeleccionat(null)
     setZones([])
-    setZonaSeleccionada(null)
+    setZonesSeleccionades([])
     const { data } = await supabase
       .from('camps').select('*').eq('poble_id', poble.id).order('nom')
     setCamps(data || [])
@@ -31,10 +31,42 @@ export default function App() {
 
   async function seleccionaCamp(camp) {
     setCampSeleccionat(camp)
-    setZonaSeleccionada(null)
+    setZonesSeleccionades([])
     const { data } = await supabase
       .from('zones').select('*').eq('camp_id', camp.id).order('codi')
     setZones(data || [])
+  }
+
+  function toggleZona(zona) {
+    setZonesSeleccionades(prev => {
+      const jaSeleccionada = prev.find(z => z.id === zona.id)
+      if (jaSeleccionada) return prev.filter(z => z.id !== zona.id)
+      return [...prev, zona]
+    })
+  }
+
+  function seleccionaFila(fila) {
+    const zonesFilа = zones.filter(z => z.fila === fila && !z.es_permanent)
+    setZonesSeleccionades(prev => {
+      const jaHiSon = zonesFilа.every(z => prev.find(p => p.id === z.id))
+      if (jaHiSon) return prev.filter(z => z.fila !== fila)
+      const sense = prev.filter(z => z.fila !== fila)
+      return [...sense, ...zonesFilа]
+    })
+  }
+
+  function seleccionaTot() {
+    const zonesCultiu = zones.filter(z => !z.es_permanent)
+    const totes = zonesCultiu.every(z => zonesSeleccionades.find(s => s.id === z.id))
+    if (totes) setZonesSeleccionades([])
+    else setZonesSeleccionades(zonesCultiu)
+  }
+
+  function resumSeleccio() {
+    if (zonesSeleccionades.length === 0) return null
+    const codis = zonesSeleccionades.map(z => z.codi).sort()
+    if (codis.length > 6) return `${codis.length} zones seleccionades`
+    return `Zones: ${codis.join(', ')}`
   }
 
   if (carregant) return (
@@ -81,8 +113,9 @@ export default function App() {
             <MapaCamp
               camp={campSeleccionat}
               zones={zones}
-              zonaSeleccionada={zonaSeleccionada}
-              onSeleccionaZona={setZonaSeleccionada}
+              zonesSeleccionades={zonesSeleccionades}
+              onToggleZona={toggleZona}
+              onSeleccionaFila={seleccionaFila}
             />
           ) : (
             <div style={styles.centrat}>
@@ -93,28 +126,44 @@ export default function App() {
           )}
         </div>
 
-        {zonaSeleccionada && (
+        {campSeleccionat && (
           <div style={styles.panell}>
-            <div style={styles.panellTitol}>
-              Zona {zonaSeleccionada.codi}
-              {zonaSeleccionada.nom && ` · ${zonaSeleccionada.nom}`}
-            </div>
-            <div style={styles.panellBadge}>
-              {zonaSeleccionada.es_permanent ? 'Zona permanent' : 'Zona de cultiu'}
-            </div>
-            {zonaSeleccionada.tub_reg && (
-              <div style={styles.panellInfo}>Tub de reg: {zonaSeleccionada.tub_reg}</div>
-            )}
-            {zonaSeleccionada.fila && (
-              <div style={styles.panellInfo}>Fila: {zonaSeleccionada.fila}</div>
-            )}
-            <button style={styles.boto} onClick={() => alert('Formulari de tasca — proper pas!')}>
-              + Nova tasca
-            </button>
-            <button style={{...styles.boto, ...styles.botoSecundari}}
-              onClick={() => alert('Historial — proper pas!')}>
-              Veure historial
-            </button>
+            {zonesSeleccionades.length > 0 ? <>
+              <div style={styles.panellTitol}>Selecció</div>
+              <div style={styles.resumSeleccio}>{resumSeleccio()}</div>
+
+              <button style={styles.boto} onClick={() => alert('Formulari de tasca — proper pas!')}>
+                + Nova tasca
+              </button>
+              <button style={{...styles.boto, ...styles.botoSecundari}}
+                onClick={() => setZonesSeleccionades([])}>
+                Netejar selecció
+              </button>
+
+              <div style={{...styles.seccio, marginTop:'16px'}}>Accions ràpides</div>
+              <button style={{...styles.boto, ...styles.botoSecundari}}
+                onClick={() => {
+                  if (zonesSeleccionades.length > 0 && zonesSeleccionades[0].fila) {
+                    seleccionaFila(zonesSeleccionades[0].fila)
+                  }
+                }}>
+                Selecciona fila sencera
+              </button>
+              <button style={{...styles.boto, ...styles.botoSecundari}}
+                onClick={seleccionaTot}>
+                Selecciona tot el camp
+              </button>
+            </> : <>
+              <div style={styles.panellTitol}>Camp</div>
+              <div style={styles.panellInfo}>{campSeleccionat.nom}</div>
+              <div style={{fontSize:'12px', color:'#aaa', marginTop:'8px'}}>
+                Toca les zones del mapa per seleccionar-les
+              </div>
+              <button style={{...styles.boto, ...styles.botoSecundari, marginTop:'16px'}}
+                onClick={seleccionaTot}>
+                Selecciona tot el camp
+              </button>
+            </>}
           </div>
         )}
       </div>
@@ -135,8 +184,8 @@ const styles = {
   item: { padding:'8px 10px', borderRadius:'6px', cursor:'pointer', fontSize:'14px', color:'#333', marginBottom:'3px' },
   itemActiu: { background:'#E1F5EE', color:'#0F6E56', fontWeight:'500' },
   panellTitol: { fontSize:'16px', fontWeight:'600', color:'#333', marginBottom:'8px' },
-  panellBadge: { display:'inline-block', padding:'3px 10px', borderRadius:'20px', fontSize:'12px', background:'#E1F5EE', color:'#0F6E56', marginBottom:'12px' },
-  panellInfo: { fontSize:'13px', color:'#666', marginBottom:'6px' },
+  resumSeleccio: { fontSize:'13px', color:'#555', background:'#f0f0f0', borderRadius:'6px', padding:'8px 10px', marginBottom:'12px' },
+  panellInfo: { fontSize:'14px', color:'#555', marginBottom:'6px' },
   boto: { width:'100%', padding:'10px', background:'#1D9E75', color:'white', border:'none', borderRadius:'8px', fontSize:'14px', cursor:'pointer', marginBottom:'8px' },
   botoSecundari: { background:'white', color:'#1D9E75', border:'1px solid #1D9E75' },
   centrat: { display:'flex', alignItems:'center', justifyContent:'center', height:'100%' },
