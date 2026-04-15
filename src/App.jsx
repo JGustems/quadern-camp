@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
 import MapaCamp from './MapaCamp.jsx'
 import FormulariTasca from './FormulariTasca.jsx'
+import Historial from './Historial.jsx'
 
 export default function App() {
   const [pobles, setPobles] = useState([])
@@ -11,6 +12,7 @@ export default function App() {
   const [campSeleccionat, setCampSeleccionat] = useState(null)
   const [zonesSeleccionades, setZonesSeleccionades] = useState([])
   const [mostrarFormulari, setMostrarFormulari] = useState(false)
+  const [mostrarHistorial, setMostrarHistorial] = useState(false)
   const [carregant, setCarregant] = useState(true)
 
   useEffect(() => { carregaPobles() }, [])
@@ -138,9 +140,13 @@ export default function App() {
               <div style={styles.panellTitol}>Selecció</div>
               <div style={styles.resumSeleccio}>{resumSeleccio()}</div>
 
-              <button style={styles.boto}
+        <button style={styles.boto}
                 onClick={() => setMostrarFormulari(true)}>
                 + Nova tasca
+              </button>
+              <button style={{...styles.boto, ...styles.botoSecundari}}
+                onClick={() => setMostrarHistorial(true)}>
+                Veure historial
               </button>
               <button style={{...styles.boto, ...styles.botoSecundari}}
                 onClick={() => setZonesSeleccionades([])}>
@@ -174,7 +180,12 @@ export default function App() {
           </div>
         )}
       </div>
-
+      {mostrarHistorial && (
+        <Historial
+          zones={zonesSeleccionades}
+          onTancar={() => setMostrarHistorial(false)}
+        />
+      )}
       {mostrarFormulari && (
         <FormulariTasca
           zones={zonesSeleccionades}
