@@ -154,6 +154,7 @@ async function seleccionaCamp(camp) {
               zonesSeleccionades={zonesSeleccionades}
               onToggleZona={toggleZona}
               onSeleccionaFila={seleccionaFila}
+              cultiusActius={cultiusActius}
             />
           ) : (
             <div style={styles.centrat}>
