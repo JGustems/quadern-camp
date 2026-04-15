@@ -189,4 +189,11 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
       )}
       <canvas
         ref={canvasRef}
-        wi
+        width={mida.w * ESCALA}
+        height={mida.h * ESCALA}
+        onClick={handleClick}
+        style={{cursor:'pointer', borderRadius:'8px', border:'1px solid #ddd', display:'block'}}
+      />
+    </div>
+  )
+}
