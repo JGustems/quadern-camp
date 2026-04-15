@@ -177,16 +177,34 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
 
   return (
     <div style={{width:'100%', height:'100%', overflow:'auto', padding:'16px'}}>
-      {Object.keys(llegenda).length > 0 && (
-        <div style={{display:'flex', flexWrap:'wrap', gap:'8px', marginBottom:'12px'}}>
-          {Object.entries(llegenda).map(([nom, color]) => (
-            <div key={nom} style={{display:'flex', alignItems:'center', gap:'5px', fontSize:'12px', color:'#555'}}>
-              <div style={{width:'12px', height:'12px', borderRadius:'3px', background:color, border:'1px solid rgba(0,0,0,0.1)'}}></div>
-              {nom}
-            </div>
-          ))}
+      <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'12px', flexWrap:'wrap'}}>
+        <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+          <label style={{fontSize:'12px', color:'#888', fontWeight:'500'}}>Veure estat del:</label>
+          <input
+            type="date"
+            value={dataConsulta || ''}
+            onChange={e => onCanviaData(e.target.value)}
+            style={{padding:'5px 10px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'13px', color:'#333'}}
+          />
+          {dataConsulta && (
+            <button
+              onClick={() => onCanviaData('')}
+              style={{padding:'5px 10px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'12px', color:'#666', background:'white', cursor:'pointer'}}>
+              Avui
+            </button>
+          )}
         </div>
-      )}
+        {Object.keys(llegenda).length > 0 && (
+          <div style={{display:'flex', flexWrap:'wrap', gap:'8px'}}>
+            {Object.entries(llegenda).map(([nom, color]) => (
+              <div key={nom} style={{display:'flex', alignItems:'center', gap:'5px', fontSize:'12px', color:'#555'}}>
+                <div style={{width:'12px', height:'12px', borderRadius:'3px', background:color, border:'1px solid rgba(0,0,0,0.1)'}}></div>
+                {nom}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
       <canvas
         ref={canvasRef}
         width={mida.w * ESCALA}
