@@ -15,6 +15,7 @@ export default function App() {
   const [mostrarHistorial, setMostrarHistorial] = useState(false)
   const [carregant, setCarregant] = useState(true)
   const [cultiusActius, setCultiusActius] = useState({})
+  const [dataConsulta, setDataConsulta] = useState('')
 
   useEffect(() => { carregaPobles() }, [])
 
@@ -40,17 +41,20 @@ async function seleccionaCamp(camp) {
     const { data } = await supabase
       .from('zones').select('*').eq('camp_id', camp.id).order('codi')
     setZones(data || [])
-    carregaCultiusActius(data || [])
+    carregaCultiusActius(data || [], dataConsulta || null)
   }
 
-  async function carregaCultiusActius(zones) {
+async function carregaCultiusActius(zones, dataConsulta = null) {
     const zonaIds = zones.map(z => z.id)
-    const { data } = await supabase
+    let query = supabase
       .from('registres')
       .select('zona_id, data, cultius(nom, color), varietats(nom), tasques(nom)')
       .in('zona_id', zonaIds)
       .order('data', { ascending: false })
 
+    if (dataConsulta) query = query.lte('data', dataConsulta)
+
+    const { data } = await query
     const cultiusPerZona = {}
     const tasquesPlantacio = ['Plantar', 'Sembrar', 'Zona permanent']
 
@@ -155,6 +159,11 @@ async function seleccionaCamp(camp) {
               onToggleZona={toggleZona}
               onSeleccionaFila={seleccionaFila}
               cultiusActius={cultiusActius}
+              dataConsulta={dataConsulta}
+              onCanviaData={(d) => {
+                setDataConsulta(d)
+                carregaCultiusActius(zones, d || null)
+              }}
             />
           ) : (
             <div style={styles.centrat}>
