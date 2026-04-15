@@ -14,6 +14,7 @@ export default function App() {
   const [mostrarFormulari, setMostrarFormulari] = useState(false)
   const [mostrarHistorial, setMostrarHistorial] = useState(false)
   const [carregant, setCarregant] = useState(true)
+  const [cultiusActius, setCultiusActius] = useState({})
 
   useEffect(() => { carregaPobles() }, [])
 
