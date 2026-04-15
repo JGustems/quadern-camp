@@ -2,13 +2,19 @@ import { useEffect, useRef } from 'react'
 
 const ESCALA = 0.25
 
-export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona, onSeleccionaFila }) {
+export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona, onSeleccionaFila, cultiusActius }) {
   const canvasRef = useRef(null)
 
-  useEffect(() => { dibuixa() }, [zones, zonesSeleccionades])
+  useEffect(() => { dibuixa() }, [zones, zonesSeleccionades, cultiusActius])
 
   function estaSeleccionada(zona) {
     return zonesSeleccionades.some(z => z.id === zona.id)
+  }
+
+  function colorZona(zona) {
+    if (estaSeleccionada(zona)) return '#B5D4F4'
+    if (cultiusActius[zona.id]?.color) return cultiusActius[zona.id].color
+    return zona.color || '#e8e4de'
   }
 
   function dibuixa() {
@@ -31,15 +37,12 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
 
     zones.forEach(zona => dibuixaZona(ctx, zona))
 
-    // Numeros de fila a l'esquerra
+    // Números de fila a dalt
     const files = [...new Set(zones.filter(z => !z.es_permanent && z.fila).map(z => z.fila))]
     files.forEach(fila => {
-      const row = 0
-      const col = fila - 1
       const am = 150 * ESCALA
-      const al = 80 * ESCALA
-      const x0 = obtenirX0() + col * am
-      const y0 = obtenirY0() + row * al
+      const x0 = obtenirX0() + (fila - 1) * am
+      const y0 = obtenirY0()
       ctx.fillStyle = '#1D9E75'
       ctx.font = 'bold 11px system-ui'
       ctx.textAlign = 'center'
@@ -83,18 +86,27 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     const al = 80 * ESCALA
     const x0 = obtenirX0() + col * am
     const y0 = obtenirY0() + row * al
+    const color = colorZona(zona)
 
-    ctx.fillStyle = sel ? '#B5D4F4' : zona.color || '#e8e4de'
+    ctx.fillStyle = color
     ctx.fillRect(x0, y0, am-1, al-1)
     ctx.strokeStyle = sel ? '#1D9E75' : 'rgba(0,0,0,0.15)'
     ctx.lineWidth = sel ? 2 : 0.5
     ctx.strokeRect(x0, y0, am-1, al-1)
 
-    ctx.fillStyle = sel ? '#042C53' : '#666'
+    // Text zona
+    ctx.fillStyle = sel ? '#042C53' : '#555'
     ctx.font = '10px system-ui'
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
-    ctx.fillText(zona.codi, x0+am/2, y0+al/2)
+    ctx.fillText(zona.codi, x0+am/2, y0+al/2 - 6)
+
+    // Nom cultiu
+    if (cultiusActius[zona.id]?.nom && !sel) {
+      ctx.fillStyle = '#333'
+      ctx.font = '9px system-ui'
+      ctx.fillText(cultiusActius[zona.id].nom, x0+am/2, y0+al/2 + 6)
+    }
   }
 
   function obtenirX0() {
@@ -151,17 +163,30 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     }
   }
 
+  // Llegenda cultius actius
+  function cultiusUnics() {
+    const vistos = {}
+    Object.values(cultiusActius).forEach(c => {
+      if (c.nom && !vistos[c.nom]) vistos[c.nom] = c.color
+    })
+    return vistos
+  }
+
   const mida = obtenirMida()
+  const llegenda = cultiusUnics()
 
   return (
     <div style={{width:'100%', height:'100%', overflow:'auto', padding:'16px'}}>
+      {Object.keys(llegenda).length > 0 && (
+        <div style={{display:'flex', flexWrap:'wrap', gap:'8px', marginBottom:'12px'}}>
+          {Object.entries(llegenda).map(([nom, color]) => (
+            <div key={nom} style={{display:'flex', alignItems:'center', gap:'5px', fontSize:'12px', color:'#555'}}>
+              <div style={{width:'12px', height:'12px', borderRadius:'3px', background:color, border:'1px solid rgba(0,0,0,0.1)'}}></div>
+              {nom}
+            </div>
+          ))}
+        </div>
+      )}
       <canvas
         ref={canvasRef}
-        width={mida.w * ESCALA}
-        height={mida.h * ESCALA}
-        onClick={handleClick}
-        style={{cursor:'pointer', borderRadius:'8px', border:'1px solid #ddd', display:'block'}}
-      />
-    </div>
-  )
-}
+        wi
