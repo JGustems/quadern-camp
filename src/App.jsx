@@ -33,12 +33,41 @@ export default function App() {
     setCamps(data || [])
   }
 
-  async function seleccionaCamp(camp) {
+async function seleccionaCamp(camp) {
     setCampSeleccionat(camp)
     setZonesSeleccionades([])
     const { data } = await supabase
       .from('zones').select('*').eq('camp_id', camp.id).order('codi')
     setZones(data || [])
+    carregaCultiusActius(data || [])
+  }
+
+  async function carregaCultiusActius(zones) {
+    const zonaIds = zones.map(z => z.id)
+    const { data } = await supabase
+      .from('registres')
+      .select('zona_id, data, cultius(nom, color), varietats(nom), tasques(nom)')
+      .in('zona_id', zonaIds)
+      .order('data', { ascending: false })
+
+    const cultiusPerZona = {}
+    const tasquesPlantacio = ['Plantar', 'Sembrar', 'Zona permanent']
+
+    zones.forEach(zona => {
+      const regsZona = (data || []).filter(r => r.zona_id === zona.id)
+      const plantacions = regsZona.filter(r => tasquesPlantacio.includes(r.tasques?.nom))
+      const neteges = regsZona.filter(r => r.tasques?.nom === 'Netejar')
+      if (!plantacions.length) return
+      const ultima = plantacions[0]
+      const ultimaNetejar = neteges[0]
+      if (ultimaNetejar && new Date(ultimaNetejar.data) > new Date(ultima.data)) return
+      cultiusPerZona[zona.id] = {
+        nom: ultima.cultius?.nom,
+        color: ultima.cultius?.color,
+        varietat: ultima.varietats?.nom,
+      }
+    })
+    setCultiusActius(cultiusPerZona)
   }
 
   function toggleZona(zona) {
