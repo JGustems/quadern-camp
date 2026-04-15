@@ -56,19 +56,33 @@ export default function Historial({ zones, onTancar }) {
     return `Zones ${codis}`
   }
 
-  function cultiuActiu() {
-    const plantacions = registres.filter(r =>
-      ['Plantar','Sembrar','Zona permanent'].includes(r.tasques?.nom)
-    )
-    const neteges = registres.filter(r => r.tasques?.nom === 'Netejar')
-    if (!plantacions.length) return null
-    const ultima = plantacions[0]
-    const ultimaNetejar = neteges[0]
-    if (ultimaNetejar && new Date(ultimaNetejar.data) > new Date(ultima.data)) return null
-    return ultima
+function cultiusActius() {
+    const tasquesPlantacio = ['Plantar','Sembrar','Zona permanent']
+    const resultat = {}
+    zones.forEach(zona => {
+      const regsZona = registres.filter(r => r.zona_id === zona.id)
+      const plantacions = regsZona.filter(r => tasquesPlantacio.includes(r.tasques?.nom))
+      const neteges = regsZona.filter(r => r.tasques?.nom === 'Netejar')
+      if (!plantacions.length) return
+      const ultima = plantacions[0]
+      const ultimaNetejar = neteges[0]
+      if (ultimaNetejar && new Date(ultimaNetejar.data) > new Date(ultima.data)) return
+      const clau = `${ultima.cultius?.nom}-${ultima.varietats?.nom}`
+      if (!resultat[clau]) {
+        resultat[clau] = {
+          nom: ultima.cultius?.nom,
+          varietat: ultima.varietats?.nom,
+          data: ultima.data,
+          zones: [zona.codi]
+        }
+      } else {
+        resultat[clau].zones.push(zona.codi)
+      }
+    })
+    return Object.values(resultat)
   }
 
-  const cultActiu = cultiuActiu()
+  const cultsActius = cultiusActius()
 
   const vistes = [
     { id: 'cronologic', label: 'Cronològic' },
@@ -87,19 +101,23 @@ export default function Historial({ zones, onTancar }) {
           <button style={styles.botoTancar} onClick={onTancar}>✕</button>
         </div>
 
-        {cultActiu && (
-          <div style={styles.cultiuActiu}>
-            <span style={styles.cultiuActiuIco}>🌱</span>
-            <div>
-              <div style={styles.cultiuActiuNom}>
-                {cultActiu.cultius?.nom}
-                {cultActiu.varietats?.nom && cultActiu.varietats.nom !== '-' && ` · ${cultActiu.varietats.nom}`}
+{cultsActius.length > 0 && (
+          <div style={{borderBottom:'1px solid #b5e0d0'}}>
+            {cultsActius.map((c, i) => (
+              <div key={i} style={styles.cultiuActiu}>
+                <span style={styles.cultiuActiuIco}>🌱</span>
+                <div>
+                  <div style={styles.cultiuActiuNom}>
+                    {c.nom}
+                    {c.varietat && c.varietat !== '-' && ` · ${c.varietat}`}
+                  </div>
+                  <div style={styles.cultiuActiuData}>
+                    Plantat el {formatData(c.data)}
+                    {c.zones.length > 0 && ` · Zones: ${c.zones.join(', ')}`}
+                  </div>
+                </div>
               </div>
-              <div style={styles.cultiuActiuData}>
-                Plantat el {formatData(cultActiu.data)}
-                {zones.length > 1 && ` · ${zones.length} zones`}
-              </div>
-            </div>
+            ))}
           </div>
         )}
 
