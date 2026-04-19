@@ -186,14 +186,16 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
             onChange={e => {
               const val = e.target.value
               console.log('data seleccionada:', val, 'longitud:', val.length)
-              if (typeof onCanviaData === 'function') {
-                if (val.length === 10) onCanviaData(val)
-                else if (val === '') onCanviaData('')
+              if (val && val.length === 10) {
+                onCanviaData(val)
+              } else if (!val) {
+                onCanviaData('')
               }
             }}
             onBlur={e => {
-              if (e.target.value.length === 10 && typeof onCanviaData === 'function') {
-                onCanviaData(e.target.value)
+              const val = e.target.value
+              if (val && val.length === 10) {
+                onCanviaData(val)
               }
             }}
             style={{padding:'5px 10px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'13px', color:'#333'}}
