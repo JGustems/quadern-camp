@@ -180,16 +180,20 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
       <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'12px', flexWrap:'wrap'}}>
         <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
           <label style={{fontSize:'12px', color:'#888', fontWeight:'500'}}>Veure estat del:</label>
-          <input
+<input
             type="date"
             value={dataConsulta || ''}
             onChange={e => {
               const val = e.target.value
-              if (val.length === 10) onCanviaData && onCanviaData(val)
-              else if (val === '') onCanviaData && onCanviaData('')
+              if (typeof onCanviaData === 'function') {
+                if (val.length === 10) onCanviaData(val)
+                else if (val === '') onCanviaData('')
+              }
             }}
             onBlur={e => {
-              if (e.target.value.length === 10) onCanviaData && onCanviaData(e.target.value)
+              if (e.target.value.length === 10 && typeof onCanviaData === 'function') {
+                onCanviaData(e.target.value)
+              }
             }}
             style={{padding:'5px 10px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'13px', color:'#333'}}
           />
