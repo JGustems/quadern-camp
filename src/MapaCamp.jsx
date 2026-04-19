@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 
 const ESCALA = 0.25
 
-export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona, onSeleccionaFila, cultiusActius, dataConsulta, onCanviData }) {
+export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona, onSeleccionaFila, cultiusActius, dataConsulta, onCanviaData }) {
   const canvasRef = useRef(null)
 
   useEffect(() => { dibuixa() }, [zones, zonesSeleccionades, cultiusActius])
