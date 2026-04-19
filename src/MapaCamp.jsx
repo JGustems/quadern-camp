@@ -183,7 +183,14 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
           <input
             type="date"
             value={dataConsulta || ''}
-            onChange={e => onCanviaData(e.target.value)}
+            onChange={e => {
+              const val = e.target.value
+              if (val.length === 10) onCanviaData && onCanviaData(val)
+              else if (val === '') onCanviaData && onCanviaData('')
+            }}
+            onBlur={e => {
+              if (e.target.value.length === 10) onCanviaData && onCanviaData(e.target.value)
+            }}
             style={{padding:'5px 10px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'13px', color:'#333'}}
           />
           {dataConsulta && (
