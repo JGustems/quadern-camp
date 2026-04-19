@@ -162,6 +162,7 @@ async function carregaCultiusActius(zones, dataFiltrar = null) {
               cultiusActius={cultiusActius}
               dataConsulta={dataConsulta}
               onCanviaData={(d) => {
+                console.log('onCanviaData cridat amb:', d, 'zones:', zones.length)
                 setDataConsulta(d)
                 carregaCultiusActius(zones, d || null)
               }}
