@@ -197,9 +197,9 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
             }}
             style={{padding:'5px 10px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'13px', color:'#333'}}
           />
-          {dataConsulta && (
+{dataConsulta && (
             <button
-              onClick={() => onCanviaData('')}
+              onClick={() => typeof onCanviaData === 'function' && onCanviaData('')}
               style={{padding:'5px 10px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'12px', color:'#666', background:'white', cursor:'pointer'}}>
               Avui
             </button>
