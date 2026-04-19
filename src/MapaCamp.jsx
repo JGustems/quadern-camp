@@ -185,6 +185,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
             value={dataConsulta || ''}
             onChange={e => {
               const val = e.target.value
+              console.log('data seleccionada:', val, 'longitud:', val.length)
               if (typeof onCanviaData === 'function') {
                 if (val.length === 10) onCanviaData(val)
                 else if (val === '') onCanviaData('')
