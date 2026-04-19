@@ -44,7 +44,8 @@ async function seleccionaCamp(camp) {
     carregaCultiusActius(data || [], dataConsulta || null)
   }
 
-async function carregaCultiusActius(zones, dataConsulta = null) {
+async function carregaCultiusActius(zones, dataFiltrar = null) {
+    console.log('carregaCultiusActius', zones.length, 'zones', 'data:', dataFiltrar)
     const zonaIds = zones.map(z => z.id)
     let query = supabase
       .from('registres')
