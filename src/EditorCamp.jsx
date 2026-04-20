@@ -24,6 +24,7 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
   const [filaInici, setFilaInici] = useState(1)
   const [x0Files, setX0Files] = useState(100)
   const [y0Files, setY0Files] = useState(100)
+  const [mousePosReal, setMousePosReal] = useState(null)
 
   const COLORS = ['#FAC775','#C0DD97','#9FE1CB','#F5C4B3','#F4C0D1','#B5D4F4','#D3D1C7','#F7C1C1','#EAF3DE','#D4B5F4']
 
@@ -297,8 +298,23 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
   }
 
   function handleMouseMove(e) {
-    if (dragPt === null) return
     const {x, y} = getCanvasPos(e)
+    
+    // Mostrar posició real
+    const mX = (x / 100).toFixed(2)
+    const mY = (y / 100).toFixed(2)
+    let info = `X: ${mX}m  Y: ${mY}m`
+    
+    if (ptsDibuix.length > 0) {
+      const ultim = ptsDibuix[ptsDibuix.length - 1]
+      const dist = Math.hypot(x - ultim.x, y - ultim.y)
+      const distM = (dist / 100).toFixed(2)
+      info += `  |  Des de l'últim punt: ${distM}m`
+    }
+    setMousePosReal(info)
+
+    // Moure punts
+    if (dragPt === null) return
     if (dragTarget === 'perimetre') {
       setPerimetre(prev => prev.map((p,i) => i===dragPt ? {x,y} : p))
     } else if (dragTarget === 'zona' && zonaSeleccionada) {
@@ -364,9 +380,13 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
 
   async function guardar() {
     setGuardant(true)
-    await supabase.from('camps').update({
-      zones_geojson: perimetre.length ? {type:'polygon', points:perimetre} : null
-    }).eq('id', camp.id)
+    const geojson = perimetre.length >= 3 ? {type:'polygon', points:perimetre} : null
+    console.log('Guardant perímetre:', geojson)
+    const { error } = await supabase.from('camps')
+      .update({ zones_geojson: geojson })
+      .eq('id', camp.id)
+    console.log('Error perímetre:', error)
+
     await supabase.from('zones').delete().eq('camp_id', camp.id)
     const zonesAGuardar = zones.map(z => ({
       camp_id: camp.id,
@@ -383,11 +403,10 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
       forma_geojson: z.forma_geojson || null,
       color: z.color || null,
     }))
-    await supabase.from('zones').insert(zonesAGuardar)
+    if (zonesAGuardar.length) await supabase.from('zones').insert(zonesAGuardar)
     setGuardant(false)
     onGuardat && onGuardat()
   }
-
   return (
     <div style={styles.overlay}>
       <div style={styles.modal}>
@@ -439,6 +458,16 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
         <div style={styles.cos}>
           <div ref={containerRef} style={styles.canvasWrap}>
             <canvas
+              {mousePosReal && (
+              <div style={{
+                position:'absolute', bottom:'8px', left:'8px',
+                background:'rgba(0,0,0,0.7)', color:'white',
+                padding:'5px 10px', borderRadius:'6px', fontSize:'12px',
+                fontFamily:'monospace', pointerEvents:'none'
+              }}>
+                {mousePosReal}
+              </div>
+            )}
               ref={canvasRef}
               width={canvasSize.w}
               height={canvasSize.h}
