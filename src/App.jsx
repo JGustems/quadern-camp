@@ -31,6 +31,7 @@ export default function App() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('sessió trobada:', session?.user?.email)
       setUsuari(session?.user ?? null)
       setCarregant(false)
     })
