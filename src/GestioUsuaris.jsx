@@ -146,3 +146,10 @@ const styles = {
   taulaHeader: { display:'flex', alignItems:'center', padding:'8px 12px', background:'#f8f7f4', borderBottom:'1px solid #eee', fontSize:'11px', fontWeight:'600', color:'#999', textTransform:'uppercase' },
   taulaFila: { display:'flex', alignItems:'center', padding:'10px 12px', borderBottom:'0.5px solid #f0f0f0' },
   badge: { padding:'3px 8px', borderRadius:'20px', fontSize:'11px', border:'none', cursor:'pointer', fontWeight:'500' },
+  badgeAdmin: { background:'#FFF3CD', color:'#856404' },
+  badgeNormal: { background:'#f0f0f0', color:'#666' },
+  botoEliminar: { padding:'4px 10px', background:'white', color:'#e55', border:'1px solid #e55', borderRadius:'6px', cursor:'pointer', fontSize:'12px' },
+  infoBox: { background:'#f8f7f4', border:'1px solid #eee', borderRadius:'8px', padding:'12px', marginTop:'20px' },
+  infoTitol: { fontSize:'12px', fontWeight:'600', color:'#555', marginBottom:'4px' },
+  infoText: { fontSize:'12px', color:'#888', lineHeight:'1.5' },
+}
