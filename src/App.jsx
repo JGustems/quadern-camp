@@ -6,6 +6,7 @@ import Historial from './Historial.jsx'
 import EditorCamp from './EditorCamp.jsx'
 import Login from './Login.jsx'
 import AppMovil from './AppMovil.jsx'
+import Configuracio from './Configuracio.jsx'
 
 export default function App() {
   const [usuari, setUsuari] = useState(null)
@@ -21,6 +22,7 @@ export default function App() {
   const [carregant, setCarregant] = useState(true)
   const [cultiusActius, setCultiusActius] = useState({})
   const [dataConsulta, setDataConsulta] = useState('')
+  const [mostrarConfig, setMostrarConfig] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -277,6 +279,10 @@ export default function App() {
               <button style={{...styles.boto, ...styles.botoSecundari}}
                 onClick={() => setMostrarEditor(true)}>
                 ✏️ Editar zones
+              </button>
+              <button style={{...styles.boto, ...styles.botoSecundari}}
+                onClick={() => setMostrarConfig(true)}>
+                ⚙️ Configuració
               </button>
             </>}
           </div>
