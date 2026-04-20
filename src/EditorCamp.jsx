@@ -477,14 +477,6 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
                 {mousePosReal}
               </div>
             )}
-              width={canvasSize.w}
-              height={canvasSize.h}
-              onClick={handleClick}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              style={{width:'100%', height:'100%', cursor: mode==='moure'?'crosshair':'pointer', display:'block'}}
-            />
           </div>
 
           <div style={styles.panell}>
