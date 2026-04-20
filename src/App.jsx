@@ -239,9 +239,7 @@ export default function App() {
               </div>
             ))}
           </>}
-          {mostrarGestioUsuaris && (
-        <GestioUsuaris onTancar={() => setMostrarGestioUsuaris(false)} />
-      )}
+          
         </div>
 
         <div style={styles.principal}>
@@ -341,6 +339,9 @@ export default function App() {
           onTancar={() => setMostrarGestioCamps(false)}
           onActualitzar={() => carregaPobles()}
         />
+      )}
+      {mostrarGestioUsuaris && (
+        <GestioUsuaris onTancar={() => setMostrarGestioUsuaris(false)} />
       )}
       {mostrarFormulari && (
         <FormulariTasca
