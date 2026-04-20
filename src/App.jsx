@@ -5,6 +5,7 @@ import FormulariTasca from './FormulariTasca.jsx'
 import Historial from './Historial.jsx'
 import EditorCamp from './EditorCamp.jsx'
 import Login from './Login.jsx'
+import AppMovil from './AppMovil.jsx'
 
 export default function App() {
   const [usuari, setUsuari] = useState(null)
@@ -140,7 +141,34 @@ export default function App() {
   )
 
   if (!usuari) return <Login onLogin={setUsuari} />
-
+  const esMobil = window.innerWidth < 768
+  
+  if (esMobil) return (
+    <AppMovil
+      usuari={usuari}
+      pobles={pobles}
+      camps={camps}
+      zones={zones}
+      cultiusActius={cultiusActius}
+      dataConsulta={dataConsulta}
+      pobleSeleccionat={pobleSeleccionat}
+      campSeleccionat={campSeleccionat}
+      zonesSeleccionades={zonesSeleccionades}
+      onSeleccionaPoble={setPobleSeleccionat}
+      onSeleccionaCamp={seleccionaCamp}
+      onToggleZona={toggleZona}
+      onSeleccionaFila={seleccionaFila}
+      onCanviaData={(d) => {
+        setDataConsulta(d)
+        carregaCultiusActius(zones, d || null)
+      }}
+      onGuardatTasca={() => {
+        setZonesSeleccionades([])
+        carregaCultiusActius(zones, dataConsulta || null)
+      }}
+      onTancarSessio={tancarSessio}
+    />
+  )
   return (
     <div style={styles.app}>
       <div style={styles.capcalera}>
