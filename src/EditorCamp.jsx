@@ -458,7 +458,16 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
         <div style={styles.cos}>
           <div ref={containerRef} style={styles.canvasWrap}>
             <canvas
-              {mousePosReal && (
+              ref={canvasRef}
+              width={canvasSize.w}
+              height={canvasSize.h}
+              onClick={handleClick}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              style={{width:'100%', height:'100%', cursor: mode==='moure'?'crosshair':'pointer', display:'block'}}
+            />
+            {mousePosReal && (
               <div style={{
                 position:'absolute', bottom:'8px', left:'8px',
                 background:'rgba(0,0,0,0.7)', color:'white',
@@ -468,7 +477,6 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
                 {mousePosReal}
               </div>
             )}
-              ref={canvasRef}
               width={canvasSize.w}
               height={canvasSize.h}
               onClick={handleClick}
