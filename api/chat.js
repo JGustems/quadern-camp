@@ -26,9 +26,13 @@ export default async function handler(req, res) {
     )
 
     const data = await response.json()
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No he pogut generar una resposta.'
+    console.log('Gemini response:', JSON.stringify(data).substring(0, 500))
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ||
+                 data.error?.message ||
+                 'No he pogut generar una resposta.'
     res.status(200).json({ text })
   } catch (error) {
-    res.status(500).json({ error: 'Error connecting to AI' })
+    console.error('Error:', error)
+    res.status(500).json({ error: error.message })
   }
 }
