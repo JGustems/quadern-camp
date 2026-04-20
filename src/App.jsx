@@ -305,6 +305,9 @@ export default function App() {
           onTancar={() => setMostrarHistorial(false)}
         />
       )}
+      {mostrarConfig && (
+        <Configuracio onTancar={() => setMostrarConfig(false)} />
+      )}
       {mostrarFormulari && (
         <FormulariTasca
           zones={zonesSeleccionades}
