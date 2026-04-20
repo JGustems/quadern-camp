@@ -41,6 +41,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    console.log('useEffect usuari:', usuari?.email)
     if (usuari) {
       carregaPobles()
       comprovaAdmin()
