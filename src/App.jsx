@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import MapaCamp from './MapaCamp.jsx'
 import FormulariTasca from './FormulariTasca.jsx'
 import Historial from './Historial.jsx'
+import EditorCamp from './EditorCamp.jsx'
 
 export default function App() {
   const [pobles, setPobles] = useState([])
@@ -16,6 +17,7 @@ export default function App() {
   const [carregant, setCarregant] = useState(true)
   const [cultiusActius, setCultiusActius] = useState({})
   const [dataConsulta, setDataConsulta] = useState('')
+  const [mostrarEditor, setMostrarEditor] = useState(false)
 
   useEffect(() => { carregaPobles() }, [])
 
@@ -217,6 +219,10 @@ async function carregaCultiusActius(zones, dataFiltrar = null) {
               <button style={{...styles.boto, ...styles.botoSecundari, marginTop:'16px'}}
                 onClick={seleccionaTot}>
                 Selecciona tot el camp
+              </button>
+              <button style={{...styles.boto, ...styles.botoSecundari}}
+                onClick={() => setMostrarEditor(true)}>
+                ✏️ Editar zones
               </button>
             </>}
           </div>
