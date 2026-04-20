@@ -53,12 +53,10 @@ REGISTRES (últims 500): ${JSON.stringify(context.registres)}
 La data d'avui és ${new Date().toLocaleDateString('ca-ES')}.
 ` : 'No hi ha dades disponibles encara.'
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
           system: `Ets un assistent agrícola especialitzat que ajuda a analitzar dades d'un quadern de camp català. 
 Respon sempre en català, de manera clara i concisa.
 Quan analitzes dades, sigues específic amb números i dates.
@@ -66,12 +64,12 @@ Si no tens prou dades per respondre, digues-ho clarament.
 Formata les respostes de manera llegible, usant llistes quan calgui.
 
 ${contextText}`,
-          messages: [{ role: 'user', content: pregunta }]
+          message: pregunta
         })
       })
 
       const data = await response.json()
-      const resposta = data.content?.[0]?.text || 'No he pogut generar una resposta.'
+      const resposta = data.text || 'No he pogut generar una resposta.'
       setMissatges(prev => [...prev, { rol: 'assistant', text: resposta }])
     } catch (e) {
       setMissatges(prev => [...prev, { rol: 'assistant', text: 'Error en connectar amb la IA. Torna-ho a provar.' }])
