@@ -38,8 +38,10 @@ export default function App() {
   }, [usuari])
 
   async function carregaPobles() {
-    const { data } = await supabase.from('pobles').select('*').order('nom')
-    setPobles(data || [])
+    const { data: poblesData } = await supabase.from('pobles').select('*').order('nom')
+    setPobles(poblesData || [])
+    const { data: campsData } = await supabase.from('camps').select('*').order('nom')
+    setCamps(campsData || [])
   }
 
   async function seleccionaPoble(poble) {
