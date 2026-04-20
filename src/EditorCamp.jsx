@@ -320,8 +320,10 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
     } else if (dragTarget === 'zona' && zonaSeleccionada) {
       setZones(prev => prev.map(z => {
         if ((z.id && z.id===zonaSeleccionada.id)||(z.tempId && z.tempId===zonaSeleccionada.tempId)) {
-          const pts = getPts(z).map((p,i) => i===dragPt ? {x,y} : p)
-          return {...z, forma_geojson:{type:'polygon', points:pts}}
+          const pts = (z.forma_geojson?.points || getPts(z)).map((p,i) => i===dragPt ? {x,y} : p)
+          const zonaActualitzada = {...z, forma_geojson:{type:'polygon', points:pts}}
+          setZonaSeleccionada(zonaActualitzada)
+          return zonaActualitzada
         }
         return z
       }))
