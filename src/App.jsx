@@ -211,7 +211,7 @@ export default function App() {
           ))}
           {pobleSeleccionat && <>
             <div style={{...styles.seccio, marginTop:'16px'}}>Camps</div>
-            {camps.map(c => (
+            {camps.filter(c => c.poble_id === pobleSeleccionat?.id).map(c => (
               <div key={c.id}
                 style={{...styles.item, ...(campSeleccionat?.id===c.id ? styles.itemActiu : {})}}
                 onClick={() => seleccionaCamp(c)}>
