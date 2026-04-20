@@ -175,18 +175,36 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
       ctx.stroke()
       const c = centroid(pts)
       const {cx,cy} = toCanvas(c.x,c.y)
-      ctx.fillStyle = 'rgba(0,0,0,0.75)'
-      ctx.font = '11px system-ui'
+
+      // Fons destacat si seleccionada
+      if (sel) {
+        ctx.fillStyle = 'rgba(29,158,117,0.15)'
+        ctx.fill()
+        // Vora gruixuda verda
+        ctx.strokeStyle = '#1D9E75'
+        ctx.lineWidth = 3
+        ctx.stroke()
+      }
+
+      // Text
+      ctx.fillStyle = sel ? '#0F6E56' : 'rgba(0,0,0,0.75)'
+      ctx.font = sel ? 'bold 12px system-ui' : '11px system-ui'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText(zona.nom || zona.codi, cx, cy)
+
+      // Punts de vèrtex si seleccionada
       if (sel) {
         pts.forEach(p => {
           const {cx,cy} = toCanvas(p.x,p.y)
           ctx.beginPath(); ctx.arc(cx,cy,6,0,Math.PI*2)
           ctx.fillStyle = '#FFD700'; ctx.fill()
-          ctx.strokeStyle = '#333'; ctx.lineWidth = 1; ctx.stroke()
+          ctx.strokeStyle = '#1D9E75'; ctx.lineWidth = 2; ctx.stroke()
         })
+        // Etiqueta "seleccionada" a dalt
+        ctx.fillStyle = '#1D9E75'
+        ctx.font = 'bold 10px system-ui'
+        ctx.fillText('✓', cx, cy + 14)
       }
     })
 
