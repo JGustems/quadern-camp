@@ -388,21 +388,29 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
     console.log('Error perímetre:', error)
 
     await supabase.from('zones').delete().eq('camp_id', camp.id)
-    const zonesAGuardar = zones.map(z => ({
-      camp_id: camp.id,
-      codi: z.codi,
-      nom: z.nom,
-      tipus: z.tipus || (z.es_permanent ? 'permanent' : 'cultiu'),
-      es_permanent: z.es_permanent || false,
-      fila: z.fila || null,
-      posicio_inici: z.posicio_inici || null,
-      posicio_fi: z.posicio_fi || null,
-      tub_reg: z.tub_reg || null,
-      amplada_m: z.amplada_m || 1.5,
-      llargada_m: z.llargada_m || 80,
-      forma_geojson: z.forma_geojson || null,
-      color: z.color || null,
-    }))
+    const zonesAGuardar = zones.map(z => {
+      // Convertir files rectangulars a polígons reals
+      let forma = z.forma_geojson || null
+      if (!forma && z.fila != null) {
+        const pts = getPts(z)
+        if (pts.length) forma = { type:'polygon', points: pts }
+      }
+      return {
+        camp_id: camp.id,
+        codi: z.codi,
+        nom: z.nom,
+        tipus: z.tipus || (z.es_permanent ? 'permanent' : 'cultiu'),
+        es_permanent: z.es_permanent || false,
+        fila: z.fila || null,
+        posicio_inici: z.posicio_inici || null,
+        posicio_fi: z.posicio_fi || null,
+        tub_reg: z.tub_reg || null,
+        amplada_m: z.amplada_m || 1.5,
+        llargada_m: z.llargada_m || 80,
+        forma_geojson: forma,
+        color: z.color || null,
+      }
+    })
     if (zonesAGuardar.length) await supabase.from('zones').insert(zonesAGuardar)
     setGuardant(false)
     onGuardat && onGuardat()
