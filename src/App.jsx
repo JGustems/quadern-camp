@@ -187,6 +187,12 @@ export default function App() {
               : ''}
           </p>
           <div style={{marginLeft:'auto', display:'flex', alignItems:'center', gap:'8px'}}>
+            <button onClick={() => setMostrarGestioCamps(true)} style={styles.botoCapcalera}>
+              🗺️ Camps
+            </button>
+            <button onClick={() => setMostrarConfig(true)} style={styles.botoCapcalera}>
+              ⚙️ Config
+            </button>
             <span style={{fontSize:'12px', opacity:0.8}}>{usuari.email}</span>
             <button onClick={tancarSessio} style={styles.botoSortir}>Sortir</button>
           </div>
@@ -282,14 +288,7 @@ export default function App() {
                 onClick={() => setMostrarEditor(true)}>
                 ✏️ Editar zones
               </button>
-              <button style={{...styles.boto, ...styles.botoSecundari}}
-                onClick={() => setMostrarConfig(true)}>
-                ⚙️ Configuració
-              </button>
-              <button style={{...styles.boto, ...styles.botoSecundari}}
-                onClick={() => setMostrarGestioCamps(true)}>
-                🗺️ Pobles i camps
-              </button>
+              
             </>}
           </div>
         )}
@@ -355,4 +354,5 @@ const styles = {
   botoSecundari: { background:'white', color:'#1D9E75', border:'1px solid #1D9E75' },
   botoSortir: { padding:'5px 12px', background:'rgba(255,255,255,0.2)', color:'white', border:'1px solid rgba(255,255,255,0.4)', borderRadius:'6px', cursor:'pointer', fontSize:'12px' },
   centrat: { display:'flex', alignItems:'center', justifyContent:'center', height:'100%' },
+  botoCapcalera: { padding:'5px 10px', background:'rgba(255,255,255,0.2)', color:'white', border:'1px solid rgba(255,255,255,0.3)', borderRadius:'6px', cursor:'pointer', fontSize:'12px' },
 }
