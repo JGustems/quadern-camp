@@ -8,6 +8,7 @@ import Login from './Login.jsx'
 import AppMovil from './AppMovil.jsx'
 import Configuracio from './Configuracio.jsx'
 import GestioCamps from './GestioCamps.jsx'
+import GestioUsuaris from './GestioUsuaris.jsx'
 
 export default function App() {
   const [usuari, setUsuari] = useState(null)
@@ -25,6 +26,8 @@ export default function App() {
   const [dataConsulta, setDataConsulta] = useState('')
   const [mostrarConfig, setMostrarConfig] = useState(false)
   const [mostrarGestioCamps, setMostrarGestioCamps] = useState(false)
+  const [mostrarGestioUsuaris, setMostrarGestioUsuaris] = useState(false)
+  const [esAdmin, setEsAdmin] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -38,8 +41,20 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (usuari) carregaPobles()
+    if (usuari) {
+      carregaPobles()
+      comprovaAdmin()
+    }
   }, [usuari])
+
+  async function comprovaAdmin() {
+    const { data } = await supabase
+      .from('usuaris_autoritzats')
+      .select('es_admin')
+      .eq('email', usuari.email)
+      .single()
+    setEsAdmin(data?.es_admin || false)
+  }
 
   async function carregaPobles() {
     const { data: poblesData } = await supabase.from('pobles').select('*').order('nom')
@@ -186,6 +201,11 @@ export default function App() {
               : pobleSeleccionat ? pobleSeleccionat.nom
               : ''}
           </p>
+          {esAdmin && (
+              <button onClick={() => setMostrarGestioUsuaris(true)} style={styles.botoCapcalera}>
+                👥 Usuaris
+              </button>
+            )}
           <div style={{marginLeft:'auto', display:'flex', alignItems:'center', gap:'8px'}}>
             <button onClick={() => setMostrarGestioCamps(true)} style={styles.botoCapcalera}>
               🗺️ Camps
@@ -219,6 +239,9 @@ export default function App() {
               </div>
             ))}
           </>}
+          {mostrarGestioUsuaris && (
+        <GestioUsuaris onTancar={() => setMostrarGestioUsuaris(false)} />
+      )}
         </div>
 
         <div style={styles.principal}>
