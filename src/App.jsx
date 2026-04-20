@@ -4,8 +4,10 @@ import MapaCamp from './MapaCamp.jsx'
 import FormulariTasca from './FormulariTasca.jsx'
 import Historial from './Historial.jsx'
 import EditorCamp from './EditorCamp.jsx'
+import Login from './Login.jsx'
 
 export default function App() {
+  const [usuari, setUsuari] = useState(null)
   const [pobles, setPobles] = useState([])
   const [camps, setCamps] = useState([])
   const [zones, setZones] = useState([])
@@ -14,17 +16,29 @@ export default function App() {
   const [zonesSeleccionades, setZonesSeleccionades] = useState([])
   const [mostrarFormulari, setMostrarFormulari] = useState(false)
   const [mostrarHistorial, setMostrarHistorial] = useState(false)
+  const [mostrarEditor, setMostrarEditor] = useState(false)
   const [carregant, setCarregant] = useState(true)
   const [cultiusActius, setCultiusActius] = useState({})
   const [dataConsulta, setDataConsulta] = useState('')
-  const [mostrarEditor, setMostrarEditor] = useState(false)
 
-  useEffect(() => { carregaPobles() }, [])
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUsuari(session?.user ?? null)
+      setCarregant(false)
+    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUsuari(session?.user ?? null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    if (usuari) carregaPobles()
+  }, [usuari])
 
   async function carregaPobles() {
     const { data } = await supabase.from('pobles').select('*').order('nom')
     setPobles(data || [])
-    setCarregant(false)
   }
 
   async function seleccionaPoble(poble) {
@@ -37,7 +51,7 @@ export default function App() {
     setCamps(data || [])
   }
 
-async function seleccionaCamp(camp) {
+  async function seleccionaCamp(camp) {
     setZonesSeleccionades([])
     const { data: campData } = await supabase
       .from('camps').select('*').eq('id', camp.id).single()
@@ -48,21 +62,18 @@ async function seleccionaCamp(camp) {
     carregaCultiusActius(data || [], dataConsulta || null)
   }
 
-async function carregaCultiusActius(zones, dataFiltrar = null) {
-    console.log('carregaCultiusActius', zones.length, 'zones', 'data:', dataFiltrar)
+  async function carregaCultiusActius(zones, dataFiltrar = null) {
     const zonaIds = zones.map(z => z.id)
+    if (!zonaIds.length) return
     let query = supabase
       .from('registres')
       .select('zona_id, data, cultius(nom, color), varietats(nom), tasques(nom)')
       .in('zona_id', zonaIds)
       .order('data', { ascending: false })
-
-    if (dataConsulta) query = query.lte('data', dataConsulta)
-
+    if (dataFiltrar) query = query.lte('data', dataFiltrar)
     const { data } = await query
     const cultiusPerZona = {}
     const tasquesPlantacio = ['Plantar', 'Sembrar', 'Zona permanent']
-
     zones.forEach(zona => {
       const regsZona = (data || []).filter(r => r.zona_id === zona.id)
       const plantacions = regsZona.filter(r => tasquesPlantacio.includes(r.tasques?.nom))
@@ -116,20 +127,36 @@ async function carregaCultiusActius(zones, dataFiltrar = null) {
     return { ...campSeleccionat, poble: pobleSeleccionat }
   }
 
+  async function tancarSessio() {
+    await supabase.auth.signOut()
+    setPobleSeleccionat(null)
+    setCampSeleccionat(null)
+    setZones([])
+    setZonesSeleccionades([])
+  }
+
   if (carregant) return (
     <div style={styles.centrat}><p style={{color:'#888'}}>Carregant...</p></div>
   )
+
+  if (!usuari) return <Login onLogin={setUsuari} />
 
   return (
     <div style={styles.app}>
       <div style={styles.capcalera}>
         <h1 style={styles.titol}>Quadern de Camp</h1>
-        <p style={styles.subtitol}>
-          {pobleSeleccionat && campSeleccionat
-            ? `${pobleSeleccionat.nom} · ${campSeleccionat.nom}`
-            : pobleSeleccionat ? pobleSeleccionat.nom
-            : 'Selecciona un poble'}
-        </p>
+        <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+          <p style={styles.subtitol}>
+            {pobleSeleccionat && campSeleccionat
+              ? `${pobleSeleccionat.nom} · ${campSeleccionat.nom}`
+              : pobleSeleccionat ? pobleSeleccionat.nom
+              : ''}
+          </p>
+          <div style={{marginLeft:'auto', display:'flex', alignItems:'center', gap:'8px'}}>
+            <span style={{fontSize:'12px', opacity:0.8}}>{usuari.email}</span>
+            <button onClick={tancarSessio} style={styles.botoSortir}>Sortir</button>
+          </div>
+        </div>
       </div>
 
       <div style={styles.contingut}>
@@ -142,7 +169,6 @@ async function carregaCultiusActius(zones, dataFiltrar = null) {
               {p.nom}
             </div>
           ))}
-
           {pobleSeleccionat && <>
             <div style={{...styles.seccio, marginTop:'16px'}}>Camps</div>
             {camps.map(c => (
@@ -166,7 +192,6 @@ async function carregaCultiusActius(zones, dataFiltrar = null) {
               cultiusActius={cultiusActius}
               dataConsulta={dataConsulta}
               onCanviaData={(d) => {
-                console.log('onCanviaData cridat amb:', d, 'zones:', zones.length)
                 setDataConsulta(d)
                 carregaCultiusActius(zones, d || null)
               }}
@@ -185,9 +210,7 @@ async function carregaCultiusActius(zones, dataFiltrar = null) {
             {zonesSeleccionades.length > 0 ? <>
               <div style={styles.panellTitol}>Selecció</div>
               <div style={styles.resumSeleccio}>{resumSeleccio()}</div>
-
-        <button style={styles.boto}
-                onClick={() => setMostrarFormulari(true)}>
+              <button style={styles.boto} onClick={() => setMostrarFormulari(true)}>
                 + Nova tasca
               </button>
               <button style={{...styles.boto, ...styles.botoSecundari}}
@@ -198,7 +221,6 @@ async function carregaCultiusActius(zones, dataFiltrar = null) {
                 onClick={() => setZonesSeleccionades([])}>
                 Netejar selecció
               </button>
-
               <div style={{...styles.seccio, marginTop:'16px'}}>Accions ràpides</div>
               <button style={{...styles.boto, ...styles.botoSecundari}}
                 onClick={() => {
@@ -230,6 +252,7 @@ async function carregaCultiusActius(zones, dataFiltrar = null) {
           </div>
         )}
       </div>
+
       {mostrarEditor && (
         <EditorCamp
           camp={campSeleccionat}
@@ -240,7 +263,7 @@ async function carregaCultiusActius(zones, dataFiltrar = null) {
           }}
         />
       )}
-      {mostrarHistorial && (
+      {mostrarHistorial && zonesSeleccionades.length > 0 && (
         <Historial
           zones={zonesSeleccionades}
           onTancar={() => setMostrarHistorial(false)}
@@ -254,6 +277,7 @@ async function carregaCultiusActius(zones, dataFiltrar = null) {
           onGuardat={() => {
             setMostrarFormulari(false)
             setZonesSeleccionades([])
+            carregaCultiusActius(zones, dataConsulta || null)
           }}
         />
       )}
@@ -263,7 +287,7 @@ async function carregaCultiusActius(zones, dataFiltrar = null) {
 
 const styles = {
   app: { fontFamily:'system-ui,sans-serif', minHeight:'100vh', background:'#f8f7f4' },
-  capcalera: { background:'#1D9E75', padding:'14px 24px', color:'white' },
+  capcalera: { background:'#1D9E75', padding:'10px 24px', color:'white' },
   titol: { fontSize:'18px', fontWeight:'600', margin:0 },
   subtitol: { fontSize:'12px', margin:'3px 0 0', opacity:0.85 },
   contingut: { display:'flex', height:'calc(100vh - 60px)' },
@@ -278,5 +302,6 @@ const styles = {
   panellInfo: { fontSize:'14px', color:'#555', marginBottom:'6px' },
   boto: { width:'100%', padding:'10px', background:'#1D9E75', color:'white', border:'none', borderRadius:'8px', fontSize:'14px', cursor:'pointer', marginBottom:'8px' },
   botoSecundari: { background:'white', color:'#1D9E75', border:'1px solid #1D9E75' },
+  botoSortir: { padding:'5px 12px', background:'rgba(255,255,255,0.2)', color:'white', border:'1px solid rgba(255,255,255,0.4)', borderRadius:'6px', cursor:'pointer', fontSize:'12px' },
   centrat: { display:'flex', alignItems:'center', justifyContent:'center', height:'100%' },
 }
