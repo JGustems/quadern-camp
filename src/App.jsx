@@ -228,6 +228,16 @@ async function carregaCultiusActius(zones, dataFiltrar = null) {
           </div>
         )}
       </div>
+      {mostrarEditor && (
+        <EditorCamp
+          camp={campSeleccionat}
+          onTancar={() => setMostrarEditor(false)}
+          onGuardat={() => {
+            setMostrarEditor(false)
+            seleccionaCamp(campSeleccionat)
+          }}
+        />
+      )}
       {mostrarHistorial && (
         <Historial
           zones={zonesSeleccionades}
