@@ -4,18 +4,30 @@ export default async function handler(req, res) {
   }
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify(req.body)
-    })
+    const { system, message } = req.body
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: system + '\n\nPregunta: ' + message }]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1000,
+          }
+        })
+      }
+    )
 
     const data = await response.json()
-    res.status(200).json(data)
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No he pogut generar una resposta.'
+    res.status(200).json({ text })
   } catch (error) {
     res.status(500).json({ error: 'Error connecting to AI' })
   }
