@@ -48,11 +48,12 @@ export default function App() {
   }, [usuari])
 
   async function comprovaAdmin() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('usuaris_autoritzats')
       .select('es_admin')
       .eq('email', usuari.email)
       .single()
+    console.log('comprovaAdmin:', data, error, usuari.email)
     setEsAdmin(data?.es_admin || false)
   }
 
