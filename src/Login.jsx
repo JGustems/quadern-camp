@@ -14,14 +14,40 @@ export default function Login({ onLogin }) {
     setMissatge('')
     setCarregant(true)
 
-    if (mode === 'login') {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) setError('Email o contrasenya incorrectes')
-      else onLogin(data.user)
-    } else {
+    if (mode === 'register') {
+      // Comprovar si l'email està autoritzat
+      const { data: autoritzat } = await supabase
+        .from('usuaris_autoritzats')
+        .select('email')
+        .eq('email', email.toLowerCase().trim())
+        .single()
+
+      if (!autoritzat) {
+        setError('Aquest email no està autoritzat. Contacta amb l\'administrador.')
+        setCarregant(false)
+        return
+      }
+
       const { error } = await supabase.auth.signUp({ email, password })
       if (error) setError('Error al registrar-se: ' + error.message)
       else setMissatge('Compte creat! Ja pots iniciar sessió.')
+    } else {
+      // Comprovar si l'email està autoritzat abans de deixar entrar
+      const { data: autoritzat } = await supabase
+        .from('usuaris_autoritzats')
+        .select('email')
+        .eq('email', email.toLowerCase().trim())
+        .single()
+
+      if (!autoritzat) {
+        setError('Aquest email no està autoritzat.')
+        setCarregant(false)
+        return
+      }
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) setError('Email o contrasenya incorrectes')
+      else onLogin(data.user)
     }
     setCarregant(false)
   }
