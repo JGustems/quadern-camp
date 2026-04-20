@@ -9,6 +9,7 @@ import AppMovil from './AppMovil.jsx'
 import Configuracio from './Configuracio.jsx'
 import GestioCamps from './GestioCamps.jsx'
 import GestioUsuaris from './GestioUsuaris.jsx'
+import XatIA from './XatIA.jsx'
 
 export default function App() {
   const [usuari, setUsuari] = useState(null)
@@ -28,6 +29,7 @@ export default function App() {
   const [mostrarGestioCamps, setMostrarGestioCamps] = useState(false)
   const [mostrarGestioUsuaris, setMostrarGestioUsuaris] = useState(false)
   const [esAdmin, setEsAdmin] = useState(false)
+  const [mostrarXat, setMostrarXat] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -216,6 +218,9 @@ export default function App() {
             <button onClick={() => setMostrarConfig(true)} style={styles.botoCapcalera}>
               ⚙️ Config
             </button>
+            <button onClick={() => setMostrarXat(true)} style={styles.botoCapcalera}>
+              🤖 Assistent
+            </button>
             <span style={{fontSize:'12px', opacity:0.8}}>{usuari.email}</span>
             <button onClick={tancarSessio} style={styles.botoSortir}>Sortir</button>
           </div>
@@ -317,7 +322,9 @@ export default function App() {
           </div>
         )}
       </div>
-
+      {mostrarXat && (
+        <XatIA onTancar={() => setMostrarXat(false)} />
+      )}
       {mostrarEditor && (
         <EditorCamp
           camp={campSeleccionat}
