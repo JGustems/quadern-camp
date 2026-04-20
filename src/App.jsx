@@ -38,8 +38,10 @@ export default function App() {
   }
 
 async function seleccionaCamp(camp) {
-    setCampSeleccionat(camp)
     setZonesSeleccionades([])
+    const { data: campData } = await supabase
+      .from('camps').select('*').eq('id', camp.id).single()
+    setCampSeleccionat(campData || camp)
     const { data } = await supabase
       .from('zones').select('*').eq('camp_id', camp.id).order('codi')
     setZones(data || [])
