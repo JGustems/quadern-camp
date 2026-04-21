@@ -598,6 +598,16 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
                       Eliminar {zonesSeleccionades.length > 1 ? `${zonesSeleccionades.length} zones` : 'zona'}
                     </button>
                     <button style={{...styles.botoPrimari, background:'#888', marginTop:'6px'}}
+                      onClick={() => {
+                        const nousPosicions = {...nomPosicions}
+                        zonesSeleccionades.forEach(z => {
+                          delete nousPosicions[z.id||z.tempId]
+                        })
+                        setNomPosicions(nousPosicions)
+                      }}>
+                      ↺ Centrar text
+                    </button>
+                    <button style={{...styles.botoPrimari, background:'#888', marginTop:'6px'}}
                       onClick={() => setZonesSeleccionades([])}>
                       Netejar selecció
                     </button>
