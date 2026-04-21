@@ -280,7 +280,7 @@ function SeccioTipusZones() {
   useEffect(() => { carregaTipus() }, [])
 
   async function carregaTipus() {
-    const { data } = await supabase.from('tipus_zona').select('*').order('ordre')
+    const { data } = await supabase.from('tipus_de_zona').select('*').order('ordre')
     setTipusZones(data || [])
   }
 
@@ -295,15 +295,15 @@ function SeccioTipusZones() {
     if (!nomNou.trim()) return
     setGuardant(true)
     const dades = { nom: nomNou, color_defecte: colorNou, es_permanent: esPermanentNou }
-    if (editant?.id) await supabase.from('tipus_zona').update(dades).eq('id', editant.id)
-    else await supabase.from('tipus_zona').insert({ ...dades, ordre: tipusZones.length + 1 })
+    if (editant?.id) await supabase.from('tipus_de_zona').update(dades).eq('id', editant.id)
+    else await supabase.from('tipus_de_zona').insert({ ...dades, ordre: tipusZones.length + 1 })
     await carregaTipus()
     setEditant(null); setGuardant(false)
   }
 
   async function eliminar() {
     if (!editant?.id) return
-    await supabase.from('tipus_zona').delete().eq('id', editant.id)
+    await supabase.from('tipus_de_zona').delete().eq('id', editant.id)
     await carregaTipus()
     setEditant(null)
   }
