@@ -3,16 +3,15 @@ import { supabase } from './supabase'
 
 const AM_FILA = 150
 const AL_FILA = 80
+const ESCALA = 0.6
 
 export default function EditorCamp({ camp, onTancar, onGuardat }) {
   const canvasRef = useRef(null)
-  const containerRef = useRef(null)
-  const [canvasSize, setCanvasSize] = useState({ w: 800, h: 500 })
   const [mode, setMode] = useState('select')
   const [zones, setZones] = useState([])
   const [perimetre, setPerimetre] = useState([])
   const [ptsDibuix, setPtsDibuix] = useState([])
-  const [zonaSeleccionada, setZonaSeleccionada] = useState(null)
+  const [zonesSeleccionades, setZonesSeleccionades] = useState([])
   const [dragPt, setDragPt] = useState(null)
   const [dragTarget, setDragTarget] = useState(null)
   const [guardant, setGuardant] = useState(false)
@@ -25,31 +24,20 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
   const [x0Files, setX0Files] = useState(100)
   const [y0Files, setY0Files] = useState(100)
   const [mousePosReal, setMousePosReal] = useState(null)
+  const [canvasSize, setCanvasSize] = useState({ w: 900, h: 600 })
 
   const COLORS = ['#FAC775','#C0DD97','#9FE1CB','#F5C4B3','#F4C0D1','#B5D4F4','#D3D1C7','#F7C1C1','#EAF3DE','#D4B5F4']
 
   const hints = {
-    select: 'Clica una zona per seleccionar-la',
+    select: 'Clic per seleccionar/deseleccionar zones · Shift+clic per selecció múltiple',
     perimetre: 'Clica per afegir punts al perímetre · "Tancar perímetre" per acabar',
     zona: 'Clica per dibuixar una zona · "Tancar zona" per acabar (mínim 3 punts)',
     files: 'Configura les files i clica "Afegir files"',
     moure: 'Arrossega els punts grocs per moure\'ls',
   }
 
-  useEffect(() => {
-    carregaDades()
-    actualitzaMida()
-    window.addEventListener('resize', actualitzaMida)
-    return () => window.removeEventListener('resize', actualitzaMida)
-  }, [camp])
-
-  useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonaSeleccionada, mode, canvasSize])
-
-  function actualitzaMida() {
-    if (!containerRef.current) return
-    const r = containerRef.current.getBoundingClientRect()
-    setCanvasSize({ w: Math.floor(r.width), h: Math.floor(r.height) })
-  }
+  useEffect(() => { carregaDades() }, [camp])
+  useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades, mode, canvasSize])
 
   async function carregaDades() {
     if (!camp) return
@@ -66,51 +54,25 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
       const col = zona.fila - 1
       const row = (zona.posicio_inici ?? 1) - 1
       return [
-        {x: x0+col*AM_FILA,        y: y0+row*AL_FILA},
-        {x: x0+col*AM_FILA+AM_FILA,y: y0+row*AL_FILA},
-        {x: x0+col*AM_FILA+AM_FILA,y: y0+row*AL_FILA+AL_FILA},
-        {x: x0+col*AM_FILA,        y: y0+row*AL_FILA+AL_FILA},
+        {x: x0+col*AM_FILA, y: y0+row*AL_FILA},
+        {x: x0+col*AM_FILA+AM_FILA, y: y0+row*AL_FILA},
+        {x: x0+col*AM_FILA+AM_FILA, y: y0+row*AL_FILA+AL_FILA},
+        {x: x0+col*AM_FILA, y: y0+row*AL_FILA+AL_FILA},
       ]
     }
     return []
   }
 
-  function bbox() {
-    const tots = [...perimetre, ...zones.flatMap(z => getPts(z))]
-    if (!tots.length) return { minX:0, minY:0, maxX:1000, maxY:700 }
-    return {
-      minX: Math.min(...tots.map(p=>p.x)) - 50,
-      minY: Math.min(...tots.map(p=>p.y)) - 50,
-      maxX: Math.max(...tots.map(p=>p.x)) + 50,
-      maxY: Math.max(...tots.map(p=>p.y)) + 50,
-    }
+  function calcularCanvasSize() {
+    const tots = [...perimetre, ...zones.flatMap(z => getPts(z)), ...ptsDibuix]
+    if (!tots.length) return { w: 900, h: 600 }
+    const maxX = Math.max(...tots.map(p => p.x)) * ESCALA + 80
+    const maxY = Math.max(...tots.map(p => p.y)) * ESCALA + 80
+    return { w: Math.max(900, maxX), h: Math.max(600, maxY) }
   }
 
-  function escala() {
-    const b = bbox()
-    const sx = canvasSize.w / (b.maxX - b.minX)
-    const sy = canvasSize.h / (b.maxY - b.minY)
-    return { s: Math.min(sx, sy, 1), b }
-  }
-
-  function toCanvas(x, y) {
-    const { s, b } = escala()
-    return { cx: (x - b.minX) * s, cy: (y - b.minY) * s }
-  }
-
-  function fromCanvas(cx, cy) {
-    const { s, b } = escala()
-    return { x: cx / s + b.minX, y: cy / s + b.minY }
-  }
-
-  function getCanvasPos(e) {
-    const canvas = canvasRef.current
-    const rect = canvas.getBoundingClientRect()
-    const scaleX = canvas.width / rect.width
-    const scaleY = canvas.height / rect.height
-    const cx = (e.clientX - rect.left) * scaleX
-    const cy = (e.clientY - rect.top) * scaleY
-    return fromCanvas(cx, cy)
+  function estaSeleccionada(zona) {
+    return zonesSeleccionades.some(z => (z.id && z.id === zona.id) || (z.tempId && z.tempId === zona.tempId))
   }
 
   function centroid(pts) {
@@ -129,12 +91,17 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
   function dibuixa() {
     const canvas = canvasRef.current
     if (!canvas) return
+    const nouSize = calcularCanvasSize()
+    if (nouSize.w !== canvasSize.w || nouSize.h !== canvasSize.h) {
+      setCanvasSize(nouSize)
+      return
+    }
     const ctx = canvas.getContext('2d')
     ctx.clearRect(0,0,canvas.width,canvas.height)
     ctx.fillStyle = '#f0ede8'
     ctx.fillRect(0,0,canvas.width,canvas.height)
 
-    // Grid lleuger
+    // Grid
     ctx.strokeStyle = 'rgba(0,0,0,0.05)'
     ctx.lineWidth = 1
     for (let x=0; x<canvas.width; x+=50) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke() }
@@ -143,10 +110,7 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
     // Perímetre
     if (perimetre.length > 1) {
       ctx.beginPath()
-      perimetre.forEach((p,i) => {
-        const {cx,cy} = toCanvas(p.x,p.y)
-        i===0 ? ctx.moveTo(cx,cy) : ctx.lineTo(cx,cy)
-      })
+      perimetre.forEach((p,i) => i===0 ? ctx.moveTo(p.x*ESCALA,p.y*ESCALA) : ctx.lineTo(p.x*ESCALA,p.y*ESCALA))
       ctx.closePath()
       ctx.fillStyle = '#e8e4de'
       ctx.fill()
@@ -159,109 +123,112 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
     zones.forEach(zona => {
       const pts = getPts(zona)
       if (!pts.length) return
-      const sel = zonaSeleccionada && (zonaSeleccionada.id === zona.id || zonaSeleccionada.tempId === zona.tempId)
+      const sel = estaSeleccionada(zona)
+
       ctx.beginPath()
-      pts.forEach((p,i) => {
-        const {cx,cy} = toCanvas(p.x,p.y)
-        i===0 ? ctx.moveTo(cx,cy) : ctx.lineTo(cx,cy)
-      })
+      pts.forEach((p,i) => i===0 ? ctx.moveTo(p.x*ESCALA,p.y*ESCALA) : ctx.lineTo(p.x*ESCALA,p.y*ESCALA))
       ctx.closePath()
       ctx.fillStyle = zona.color || '#C0DD97'
-      ctx.globalAlpha = 0.75
+      ctx.globalAlpha = sel ? 1 : 0.75
       ctx.fill()
       ctx.globalAlpha = 1
-      ctx.strokeStyle = sel ? '#1D9E75' : 'rgba(0,0,0,0.2)'
-      ctx.lineWidth = sel ? 2.5 : 0.8
-      ctx.stroke()
-      const c = centroid(pts)
-      const {cx,cy} = toCanvas(c.x,c.y)
 
-      // Fons destacat si seleccionada
       if (sel) {
-        ctx.fillStyle = 'rgba(29,158,117,0.15)'
+        ctx.fillStyle = 'rgba(29,158,117,0.2)'
         ctx.fill()
-        // Vora gruixuda verda
         ctx.strokeStyle = '#1D9E75'
         ctx.lineWidth = 3
         ctx.stroke()
+      } else {
+        ctx.strokeStyle = 'rgba(0,0,0,0.2)'
+        ctx.lineWidth = 0.8
+        ctx.stroke()
       }
 
-      // Text
+      const c = centroid(pts)
       ctx.fillStyle = sel ? '#0F6E56' : 'rgba(0,0,0,0.75)'
       ctx.font = sel ? 'bold 12px system-ui' : '11px system-ui'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.fillText(zona.nom || zona.codi, cx, cy)
+      ctx.fillText(zona.nom || zona.codi, c.x*ESCALA, c.y*ESCALA)
 
-      // Punts de vèrtex si seleccionada
-      if (sel) {
+      if (sel && (mode === 'moure' || mode === 'select')) {
         pts.forEach(p => {
-          const {cx,cy} = toCanvas(p.x,p.y)
-          ctx.beginPath(); ctx.arc(cx,cy,6,0,Math.PI*2)
+          ctx.beginPath(); ctx.arc(p.x*ESCALA,p.y*ESCALA,6,0,Math.PI*2)
           ctx.fillStyle = '#FFD700'; ctx.fill()
           ctx.strokeStyle = '#1D9E75'; ctx.lineWidth = 2; ctx.stroke()
         })
-        // Etiqueta "seleccionada" a dalt
-        ctx.fillStyle = '#1D9E75'
-        ctx.font = 'bold 10px system-ui'
-        ctx.fillText('✓', cx, cy + 14)
       }
     })
 
     // Dibuix en curs
     if (ptsDibuix.length) {
       ctx.beginPath()
-      ptsDibuix.forEach((p,i) => {
-        const {cx,cy} = toCanvas(p.x,p.y)
-        i===0 ? ctx.moveTo(cx,cy) : ctx.lineTo(cx,cy)
-      })
+      ptsDibuix.forEach((p,i) => i===0 ? ctx.moveTo(p.x*ESCALA,p.y*ESCALA) : ctx.lineTo(p.x*ESCALA,p.y*ESCALA))
       ctx.strokeStyle = '#1D9E75'
       ctx.lineWidth = 2
       ctx.setLineDash([5,4])
       ctx.stroke()
       ctx.setLineDash([])
       ptsDibuix.forEach((p,i) => {
-        const {cx,cy} = toCanvas(p.x,p.y)
-        ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2)
+        ctx.beginPath(); ctx.arc(p.x*ESCALA,p.y*ESCALA,5,0,Math.PI*2)
         ctx.fillStyle = i===0 ? '#1D9E75' : 'white'
         ctx.fill()
         ctx.strokeStyle = '#1D9E75'; ctx.lineWidth = 1.5; ctx.stroke()
       })
     }
 
-    // Punts del perímetre
+    // Punts perímetre
     if (mode === 'perimetre' || mode === 'moure') {
-      perimetre.forEach((p,i) => {
-        const {cx,cy} = toCanvas(p.x,p.y)
-        ctx.beginPath(); ctx.arc(cx,cy,5,0,Math.PI*2)
+      perimetre.forEach(p => {
+        ctx.beginPath(); ctx.arc(p.x*ESCALA,p.y*ESCALA,5,0,Math.PI*2)
         ctx.fillStyle = '#1D9E75'; ctx.fill()
         ctx.strokeStyle = 'white'; ctx.lineWidth = 1.5; ctx.stroke()
       })
     }
   }
 
+  function getCanvasPos(e) {
+    const canvas = canvasRef.current
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    return {
+      x: ((e.clientX - rect.left) * scaleX) / ESCALA,
+      y: ((e.clientY - rect.top) * scaleY) / ESCALA
+    }
+  }
+
   function handleClick(e) {
     const {x, y} = getCanvasPos(e)
 
-    if (mode === 'perimetre') {
-      setPtsDibuix(prev => [...prev, {x, y}])
-      return
-    }
-    if (mode === 'zona') {
-      setPtsDibuix(prev => [...prev, {x, y}])
-      return
-    }
+    if (mode === 'perimetre') { setPtsDibuix(prev => [...prev, {x,y}]); return }
+    if (mode === 'zona') { setPtsDibuix(prev => [...prev, {x,y}]); return }
+
     if (mode === 'select') {
       let trobada = null
       for (let i=zones.length-1; i>=0; i--) {
         const pts = getPts(zones[i])
         if (pts.length && ptInPoly(x, y, pts)) { trobada = zones[i]; break }
       }
-      setZonaSeleccionada(trobada)
       if (trobada) {
+        if (e.shiftKey) {
+          // Shift+clic: afegir/treure de la selecció
+          setZonesSeleccionades(prev => {
+            const jaHi = prev.some(z => (z.id && z.id===trobada.id)||(z.tempId && z.tempId===trobada.tempId))
+            if (jaHi) return prev.filter(z => !((z.id && z.id===trobada.id)||(z.tempId && z.tempId===trobada.tempId)))
+            return [...prev, trobada]
+          })
+        } else {
+          // Clic normal: seleccionar només aquesta
+          const jaSeleccionada = estaSeleccionada(trobada)
+          setZonesSeleccionades(jaSeleccionada && zonesSeleccionades.length === 1 ? [] : [trobada])
+        }
         setNomZona(trobada.nom || trobada.codi || '')
         setTipusZona(trobada.es_permanent ? 'permanent' : 'cultiu')
         setColorZona(trobada.color || '#C0DD97')
+      } else {
+        setZonesSeleccionades([])
       }
     }
   }
@@ -285,7 +252,7 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
       forma_geojson: { type:'polygon', points: [...ptsDibuix] },
     }
     setZones(prev => [...prev, novaZona])
-    setZonaSeleccionada(novaZona)
+    setZonesSeleccionades([novaZona])
     setPtsDibuix([])
   }
 
@@ -293,23 +260,16 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
     if (mode !== 'moure') return
     const {x, y} = getCanvasPos(e)
     const RADI = 15
-
-    // Buscar punt del perímetre
     for (let i=0; i<perimetre.length; i++) {
       if (Math.hypot(x-perimetre[i].x, y-perimetre[i].y) < RADI) {
-        setDragTarget('perimetre')
-        setDragPt(i)
-        return
+        setDragTarget('perimetre'); setDragPt(i); return
       }
     }
-    // Buscar punt de zona seleccionada
-    if (zonaSeleccionada) {
-      const pts = getPts(zonaSeleccionada)
+    for (const zona of zonesSeleccionades) {
+      const pts = getPts(zona)
       for (let i=0; i<pts.length; i++) {
         if (Math.hypot(x-pts[i].x, y-pts[i].y) < RADI) {
-          setDragTarget('zona')
-          setDragPt(i)
-          return
+          setDragTarget('zona'); setDragPt(i); return
         }
       }
     }
@@ -317,30 +277,25 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
 
   function handleMouseMove(e) {
     const {x, y} = getCanvasPos(e)
-    
-    // Mostrar posició real
-    const mX = (x / 100).toFixed(2)
-    const mY = (y / 100).toFixed(2)
+    const mX = (x/100).toFixed(2), mY = (y/100).toFixed(2)
     let info = `X: ${mX}m  Y: ${mY}m`
-    
     if (ptsDibuix.length > 0) {
-      const ultim = ptsDibuix[ptsDibuix.length - 1]
-      const dist = Math.hypot(x - ultim.x, y - ultim.y)
-      const distM = (dist / 100).toFixed(2)
-      info += `  |  Des de l'últim punt: ${distM}m`
+      const ultim = ptsDibuix[ptsDibuix.length-1]
+      const dist = Math.hypot(x-ultim.x, y-ultim.y)
+      info += `  |  Dist: ${(dist/100).toFixed(2)}m`
     }
     setMousePosReal(info)
 
-    // Moure punts
     if (dragPt === null) return
     if (dragTarget === 'perimetre') {
       setPerimetre(prev => prev.map((p,i) => i===dragPt ? {x,y} : p))
-    } else if (dragTarget === 'zona' && zonaSeleccionada) {
+    } else if (dragTarget === 'zona' && zonesSeleccionades.length > 0) {
+      const zona = zonesSeleccionades[0]
       setZones(prev => prev.map(z => {
-        if ((z.id && z.id===zonaSeleccionada.id)||(z.tempId && z.tempId===zonaSeleccionada.tempId)) {
+        if ((z.id && z.id===zona.id)||(z.tempId && z.tempId===zona.tempId)) {
           const pts = (z.forma_geojson?.points || getPts(z)).map((p,i) => i===dragPt ? {x,y} : p)
           const zonaActualitzada = {...z, forma_geojson:{type:'polygon', points:pts}}
-          setZonaSeleccionada(zonaActualitzada)
+          setZonesSeleccionades([zonaActualitzada])
           return zonaActualitzada
         }
         return z
@@ -356,24 +311,15 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
       for (let row=0; row<numPosicions; row++) {
         const fila = filaInici + col
         const pos = row + 1
-        const codi = (fila*10 + pos).toString()
+        const codi = (fila*10+pos).toString()
         if (!zones.find(z => z.codi===codi && !z.es_permanent)) {
           novesZones.push({
             tempId: Date.now()+col*100+row,
-            camp_id: camp.id,
-            codi,
-            nom: codi,
-            tipus: 'cultiu',
-            es_permanent: false,
-            fila,
-            posicio_inici: pos,
-            posicio_fi: pos,
-            tub_reg: fila,
-            amplada_m: 1.5,
-            llargada_m: 80,
-            color: '#e8e4de',
-            _x0: x0Files,
-            _y0: y0Files,
+            camp_id: camp.id, codi, nom: codi,
+            tipus: 'cultiu', es_permanent: false,
+            fila, posicio_inici: pos, posicio_fi: pos, tub_reg: fila,
+            amplada_m: 1.5, llargada_m: 80, color: '#e8e4de',
+            _x0: x0Files, _y0: y0Files,
           })
         }
       }
@@ -381,36 +327,35 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
     setZones(prev => [...prev, ...novesZones])
   }
 
-  function actualitzarZona() {
-    if (!zonaSeleccionada) return
+  function actualitzarZonesSeleccionades() {
     setZones(prev => prev.map(z => {
-      if ((z.id && z.id===zonaSeleccionada.id)||(z.tempId && z.tempId===zonaSeleccionada.tempId)) {
-        return {...z, nom:nomZona, codi:nomZona, es_permanent:tipusZona!=='cultiu', color:colorZona}
+      if (estaSeleccionada(z)) {
+        return {
+          ...z,
+          nom: zonesSeleccionades.length === 1 ? nomZona : z.nom,
+          codi: zonesSeleccionades.length === 1 ? nomZona : z.codi,
+          es_permanent: tipusZona !== 'cultiu',
+          color: colorZona,
+        }
       }
       return z
     }))
   }
 
-  function eliminarZona() {
-    setZones(prev => prev.filter(z =>
-      !(z.id && z.id===zonaSeleccionada.id) && !(z.tempId && z.tempId===zonaSeleccionada.tempId)
-    ))
-    setZonaSeleccionada(null)
+  function eliminarZonesSeleccionades() {
+    setZones(prev => prev.filter(z => !estaSeleccionada(z)))
+    setZonesSeleccionades([])
   }
 
   async function guardar() {
     setGuardant(true)
-
-    // Guardar perímetre
     await supabase.from('camps').update({
-      zones_geojson: perimetre.length ? { type:'polygon', points:perimetre } : null
+      zones_geojson: perimetre.length ? {type:'polygon', points:perimetre} : null
     }).eq('id', camp.id)
 
-    // Separar zones existents de noves
     const zonesExistents = zones.filter(z => z.id)
     const zonesNoves = zones.filter(z => !z.id && z.tempId)
 
-    // UPDATE zones existents
     for (const z of zonesExistents) {
       let forma = z.forma_geojson || null
       if (!forma && z.fila != null) {
@@ -418,22 +363,16 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
         if (pts.length) forma = { type:'polygon', points: pts }
       }
       await supabase.from('zones').update({
-        codi: z.codi,
-        nom: z.nom,
+        codi: z.codi, nom: z.nom,
         tipus: z.tipus || (z.es_permanent ? 'permanent' : 'cultiu'),
         es_permanent: z.es_permanent || false,
-        fila: z.fila || null,
-        posicio_inici: z.posicio_inici || null,
-        posicio_fi: z.posicio_fi || null,
-        tub_reg: z.tub_reg || null,
-        amplada_m: z.amplada_m || 1.5,
-        llargada_m: z.llargada_m || 80,
-        forma_geojson: forma,
-        color: z.color || null,
+        fila: z.fila || null, posicio_inici: z.posicio_inici || null,
+        posicio_fi: z.posicio_fi || null, tub_reg: z.tub_reg || null,
+        amplada_m: z.amplada_m || 1.5, llargada_m: z.llargada_m || 80,
+        forma_geojson: forma, color: z.color || null,
       }).eq('id', z.id)
     }
 
-    // INSERT zones noves
     if (zonesNoves.length) {
       const zonesAInserir = zonesNoves.map(z => {
         let forma = z.forma_geojson || null
@@ -442,37 +381,28 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
           if (pts.length) forma = { type:'polygon', points: pts }
         }
         return {
-          camp_id: camp.id,
-          codi: z.codi,
-          nom: z.nom,
+          camp_id: camp.id, codi: z.codi, nom: z.nom,
           tipus: z.tipus || (z.es_permanent ? 'permanent' : 'cultiu'),
           es_permanent: z.es_permanent || false,
-          fila: z.fila || null,
-          posicio_inici: z.posicio_inici || null,
-          posicio_fi: z.posicio_fi || null,
-          tub_reg: z.tub_reg || null,
-          amplada_m: z.amplada_m || 1.5,
-          llargada_m: z.llargada_m || 80,
-          forma_geojson: forma,
-          color: z.color || null,
+          fila: z.fila || null, posicio_inici: z.posicio_inici || null,
+          posicio_fi: z.posicio_fi || null, tub_reg: z.tub_reg || null,
+          amplada_m: z.amplada_m || 1.5, llargada_m: z.llargada_m || 80,
+          forma_geojson: forma, color: z.color || null,
         }
       })
       await supabase.from('zones').insert(zonesAInserir)
     }
 
-    // DELETE zones eliminades (les que estaven a la BD però ja no són a la llista)
-    const { data: zonesActuals } = await supabase
-      .from('zones').select('id').eq('camp_id', camp.id)
+    const { data: zonesActuals } = await supabase.from('zones').select('id').eq('camp_id', camp.id)
     const idsActuals = zonesActuals?.map(z => z.id) || []
     const idsAMantenir = zonesExistents.map(z => z.id)
     const idsAEliminar = idsActuals.filter(id => !idsAMantenir.includes(id))
-    if (idsAEliminar.length) {
-      await supabase.from('zones').delete().in('id', idsAEliminar)
-    }
+    if (idsAEliminar.length) await supabase.from('zones').delete().in('id', idsAEliminar)
 
     setGuardant(false)
     onGuardat && onGuardat()
   }
+
   return (
     <div style={styles.overlay}>
       <div style={styles.modal}>
@@ -503,26 +433,19 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
               {b.icon} {b.label}
             </button>
           ))}
-
           {mode === 'perimetre' && ptsDibuix.length >= 3 && (
-            <button style={styles.botoAccio} onClick={tancarPerimetre}>
-              ✅ Tancar perímetre
-            </button>
+            <button style={styles.botoAccio} onClick={tancarPerimetre}>✅ Tancar perímetre</button>
           )}
           {mode === 'zona' && ptsDibuix.length >= 3 && (
-            <button style={styles.botoAccio} onClick={tancarZona}>
-              ✅ Tancar zona
-            </button>
+            <button style={styles.botoAccio} onClick={tancarZona}>✅ Tancar zona</button>
           )}
           {ptsDibuix.length > 0 && (
-            <button style={{...styles.botoAccio, background:'#e55'}} onClick={() => setPtsDibuix([])}>
-              ✕ Cancel·lar
-            </button>
+            <button style={{...styles.botoAccio, background:'#e55'}} onClick={() => setPtsDibuix([])}>✕ Cancel·lar</button>
           )}
         </div>
 
         <div style={styles.cos}>
-          <div ref={containerRef} style={styles.canvasWrap}>
+          <div style={styles.canvasWrap}>
             <canvas
               ref={canvasRef}
               width={canvasSize.w}
@@ -531,24 +454,17 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
-              style={{width:'100%', height:'100%', cursor: mode==='moure'?'crosshair':'pointer', display:'block'}}
+              style={{cursor: mode==='moure'?'crosshair':'pointer', display:'block'}}
             />
             {mousePosReal && (
-              <div style={{
-                position:'absolute', bottom:'8px', left:'8px',
-                background:'rgba(0,0,0,0.7)', color:'white',
-                padding:'5px 10px', borderRadius:'6px', fontSize:'12px',
-                fontFamily:'monospace', pointerEvents:'none'
-              }}>
-                {mousePosReal}
-              </div>
+              <div style={styles.posInfo}>{mousePosReal}</div>
             )}
           </div>
 
           <div style={styles.panell}>
             {mode === 'files' && (
               <div>
-                <div style={styles.seccio}>Files estàndard (1,5m × 80m)</div>
+                <div style={styles.seccio}>Files estàndard</div>
                 <div style={styles.grup}>
                   <label style={styles.label}>Fila inicial</label>
                   <input type="number" style={styles.input} value={filaInici} min="1"
@@ -565,91 +481,134 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
                     onChange={e => setNumPosicions(parseInt(e.target.value)||1)}/>
                 </div>
                 <div style={styles.grup}>
-                  <label style={styles.label}>Posició X inici</label>
+                  <label style={styles.label}>X inici</label>
                   <input type="number" style={styles.input} value={x0Files}
                     onChange={e => setX0Files(parseInt(e.target.value)||0)}/>
                 </div>
                 <div style={styles.grup}>
-                  <label style={styles.label}>Posició Y inici</label>
+                  <label style={styles.label}>Y inici</label>
                   <input type="number" style={styles.input} value={y0Files}
                     onChange={e => setY0Files(parseInt(e.target.value)||0)}/>
                 </div>
-                <button style={styles.botoPrimari} onClick={afegirFiles}>
-                  ⊞ Afegir files
-                </button>
+                <button style={styles.botoPrimari} onClick={afegirFiles}>⊞ Afegir files</button>
                 <div style={{fontSize:'11px', color:'#aaa', marginTop:'6px'}}>
-                  Files {filaInici}–{filaInici+numFiles-1}, posicions 1–{numPosicions}
+                  Files {filaInici}–{filaInici+numFiles-1}, pos 1–{numPosicions}
                 </div>
               </div>
             )}
 
-            {(mode !== 'files') && (
+            {mode !== 'files' && (
               <div>
-                <div style={styles.seccio}>
-                  {zonaSeleccionada ? 'Zona seleccionada' : 'Propietats nova zona'}
-                </div>
-                <div style={styles.grup}>
-                  <label style={styles.label}>Nom</label>
-                  <input type="text" style={styles.input} value={nomZona}
-                    onChange={e => setNomZona(e.target.value)} placeholder="ex: Caseta"/>
-                </div>
-                <div style={styles.grup}>
-                  <label style={styles.label}>Tipus</label>
-                  <select style={styles.input} value={tipusZona}
-                    onChange={e => setTipusZona(e.target.value)}>
-                    <option value="cultiu">Cultiu</option>
-                    <option value="permanent">Permanent</option>
-                    <option value="caminal">Caminal</option>
-                    <option value="altres">Altres</option>
-                  </select>
-                </div>
-                <div style={styles.grup}>
-                  <label style={styles.label}>Color</label>
-                  <div style={{display:'flex', flexWrap:'wrap', gap:'4px'}}>
-                    {COLORS.map(c => (
-                      <div key={c} onClick={() => setColorZona(c)}
-                        style={{width:'22px', height:'22px', borderRadius:'4px', background:c,
-                          border: colorZona===c?'2.5px solid #1D9E75':'1px solid rgba(0,0,0,0.2)',
-                          cursor:'pointer'}}/>
+                {zonesSeleccionades.length > 0 ? (
+                  <div>
+                    <div style={styles.seccio}>
+                      {zonesSeleccionades.length === 1 ? 'Zona seleccionada' : `${zonesSeleccionades.length} zones seleccionades`}
+                    </div>
+                    {zonesSeleccionades.length === 1 && (
+                      <div style={styles.grup}>
+                        <label style={styles.label}>Nom</label>
+                        <input style={styles.input} value={nomZona}
+                          onChange={e => setNomZona(e.target.value)}/>
+                      </div>
+                    )}
+                    <div style={styles.grup}>
+                      <label style={styles.label}>Tipus</label>
+                      <select style={styles.input} value={tipusZona}
+                        onChange={e => setTipusZona(e.target.value)}>
+                        <option value="cultiu">Cultiu</option>
+                        <option value="permanent">Permanent</option>
+                        <option value="caminal">Caminal</option>
+                        <option value="altres">Altres</option>
+                      </select>
+                    </div>
+                    <div style={styles.grup}>
+                      <label style={styles.label}>Color</label>
+                      <div style={{display:'flex', flexWrap:'wrap', gap:'4px'}}>
+                        {COLORS.map(c => (
+                          <div key={c} onClick={() => setColorZona(c)}
+                            style={{width:'22px', height:'22px', borderRadius:'4px', background:c,
+                              border: colorZona===c?'2.5px solid #1D9E75':'1px solid rgba(0,0,0,0.15)',
+                              cursor:'pointer'}}/>
+                        ))}
+                      </div>
+                    </div>
+                    <button style={styles.botoPrimari} onClick={actualitzarZonesSeleccionades}>
+                      Actualitzar {zonesSeleccionades.length > 1 ? `${zonesSeleccionades.length} zones` : 'zona'}
+                    </button>
+                    <button style={{...styles.botoPrimari, background:'#e55', marginTop:'6px'}}
+                      onClick={eliminarZonesSeleccionades}>
+                      Eliminar {zonesSeleccionades.length > 1 ? `${zonesSeleccionades.length} zones` : 'zona'}
+                    </button>
+                    <button style={{...styles.botoPrimari, background:'#888', marginTop:'6px'}}
+                      onClick={() => setZonesSeleccionades([])}>
+                      Netejar selecció
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <div style={styles.seccio}>Nova zona</div>
+                    <div style={styles.grup}>
+                      <label style={styles.label}>Nom</label>
+                      <input style={styles.input} value={nomZona}
+                        onChange={e => setNomZona(e.target.value)} placeholder="ex: Caseta"/>
+                    </div>
+                    <div style={styles.grup}>
+                      <label style={styles.label}>Tipus</label>
+                      <select style={styles.input} value={tipusZona}
+                        onChange={e => setTipusZona(e.target.value)}>
+                        <option value="cultiu">Cultiu</option>
+                        <option value="permanent">Permanent</option>
+                        <option value="caminal">Caminal</option>
+                        <option value="altres">Altres</option>
+                      </select>
+                    </div>
+                    <div style={styles.grup}>
+                      <label style={styles.label}>Color</label>
+                      <div style={{display:'flex', flexWrap:'wrap', gap:'4px'}}>
+                        {COLORS.map(c => (
+                          <div key={c} onClick={() => setColorZona(c)}
+                            style={{width:'22px', height:'22px', borderRadius:'4px', background:c,
+                              border: colorZona===c?'2.5px solid #1D9E75':'1px solid rgba(0,0,0,0.15)',
+                              cursor:'pointer'}}/>
+                        ))}
+                      </div>
+                    </div>
+                    <div style={{fontSize:'11px', color:'#aaa', marginTop:'8px'}}>
+                      Clica "Zona lliure" per dibuixar o "Afegir files" per generar automàticament
+                    </div>
+                  </div>
+                )}
+
+                <div style={{marginTop:'16px'}}>
+                  <div style={styles.seccio}>Zones ({zones.length})</div>
+                  <div style={{maxHeight:'200px', overflowY:'auto'}}>
+                    {zones.map(z => (
+                      <div key={z.id||z.tempId}
+                        onClick={() => {
+                          setZonesSeleccionades([z])
+                          setNomZona(z.nom||z.codi||'')
+                          setTipusZona(z.es_permanent?'permanent':'cultiu')
+                          setColorZona(z.color||'#C0DD97')
+                          setMode('select')
+                        }}
+                        style={{display:'flex', alignItems:'center', gap:'6px', padding:'5px 6px',
+                          borderRadius:'5px', cursor:'pointer', marginBottom:'2px',
+                          background: estaSeleccionada(z) ? '#E1F5EE' : 'transparent'}}>
+                        <div style={{width:'10px',height:'10px',borderRadius:'2px',
+                          background:z.color||'#ddd',flexShrink:0}}/>
+                        <span style={{fontSize:'12px', color: estaSeleccionada(z)?'#0F6E56':'#333', flex:1}}>
+                          {z.nom||z.codi}
+                        </span>
+                        {estaSeleccionada(z) && <span style={{fontSize:'11px', color:'#1D9E75'}}>✓</span>}
+                        <span style={{fontSize:'10px',color:'#aaa'}}>
+                          {z.es_permanent?'perm':'cultiu'}
+                        </span>
+                      </div>
                     ))}
                   </div>
                 </div>
-                {zonaSeleccionada && (
-                  <>
-                    <button style={styles.botoPrimari} onClick={actualitzarZona}>
-                      Actualitzar zona
-                    </button>
-                    <button style={{...styles.botoPrimari, background:'#e55', marginTop:'6px'}}
-                      onClick={eliminarZona}>
-                      Eliminar zona
-                    </button>
-                  </>
-                )}
               </div>
             )}
-
-            <div style={{marginTop:'16px'}}>
-              <div style={styles.seccio}>Zones ({zones.length})</div>
-              <div style={{maxHeight:'180px', overflowY:'auto'}}>
-                {zones.map(z => (
-                  <div key={z.id||z.tempId}
-                    onClick={() => {
-                      setZonaSeleccionada(z)
-                      setNomZona(z.nom||z.codi||'')
-                      setTipusZona(z.es_permanent?'permanent':'cultiu')
-                      setColorZona(z.color||'#C0DD97')
-                      setMode('select')
-                    }}
-                    style={{display:'flex', alignItems:'center', gap:'6px', padding:'4px 0',
-                      borderBottom:'0.5px solid #eee', cursor:'pointer',
-                      background:(zonaSeleccionada?.id===z.id||zonaSeleccionada?.tempId===z.tempId)?'#E1F5EE':'transparent'}}>
-                    <div style={{width:'10px',height:'10px',borderRadius:'2px',background:z.color||'#ddd',flexShrink:0}}/>
-                    <span style={{fontSize:'12px',color:'#333'}}>{z.nom||z.codi}</span>
-                    <span style={{fontSize:'10px',color:'#aaa',marginLeft:'auto'}}>{z.es_permanent?'perm':'cultiu'}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -662,15 +621,16 @@ const styles = {
   modal: { background:'white', borderRadius:'12px', width:'99vw', height:'97vh', display:'flex', flexDirection:'column', overflow:'hidden' },
   cap: { padding:'12px 16px', borderBottom:'1px solid #eee', display:'flex', alignItems:'center', gap:'12px', flexShrink:0 },
   titol: { fontSize:'15px', fontWeight:'600', color:'#333' },
-  hint: { fontSize:'12px', color:'#888', marginTop:'2px' },
-  botoTancar: { background:'none', border:'none', fontSize:'20px', cursor:'pointer', color:'#999', padding:'0 4px' },
+  hint: { fontSize:'11px', color:'#888', marginTop:'2px' },
+  botoTancar: { background:'none', border:'none', fontSize:'20px', cursor:'pointer', color:'#999' },
   toolbar: { display:'flex', gap:'6px', padding:'8px 12px', borderBottom:'1px solid #eee', flexShrink:0, flexWrap:'wrap', alignItems:'center' },
   modeBtn: { padding:'6px 12px', border:'1px solid #ddd', borderRadius:'8px', cursor:'pointer', background:'white', color:'#666', fontSize:'13px' },
   modeBtnActiu: { background:'#1D9E75', color:'white', borderColor:'#1D9E75', fontWeight:'500' },
   botoAccio: { padding:'6px 14px', border:'none', borderRadius:'8px', cursor:'pointer', background:'#1D9E75', color:'white', fontSize:'13px', fontWeight:'500' },
   botoGuardar: { padding:'7px 18px', background:'#1D9E75', color:'white', border:'none', borderRadius:'8px', cursor:'pointer', fontWeight:'500', fontSize:'13px' },
-  cos: { flex:1, display:'flex', overflow:'hidden' },
-  canvasWrap: { flex:1, overflow:'hidden', position:'relative' },
+  cos: { flex:1, display:'flex', overflow:'auto' },
+  canvasWrap: { flex:1, position:'relative', overflow:'auto' },
+  posInfo: { position:'fixed', bottom:'16px', left:'220px', background:'rgba(0,0,0,0.7)', color:'white', padding:'5px 10px', borderRadius:'6px', fontSize:'12px', fontFamily:'monospace', pointerEvents:'none' },
   panell: { width:'210px', borderLeft:'1px solid #eee', padding:'12px', overflowY:'auto', flexShrink:0 },
   seccio: { fontSize:'11px', fontWeight:'600', color:'#999', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'8px' },
   grup: { marginBottom:'8px' },
