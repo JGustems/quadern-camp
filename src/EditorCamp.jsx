@@ -38,7 +38,7 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
   }
 
   useEffect(() => { carregaDades() }, [camp])
-  useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades, mode, canvasSize])
+useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades, mode, canvasSize, nomPosicions])
 
   async function carregaDades() {
     if (!camp) return
