@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react'
 
-const ESCALA = 0.25
-
 export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona, onSeleccionaFila, cultiusActius, dataConsulta, onCanviaData }) {
   const canvasRef = useRef(null)
+  const containerRef = useRef(null)
 
   useEffect(() => { dibuixa() }, [zones, zonesSeleccionades, cultiusActius])
 
@@ -11,22 +10,76 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     return zonesSeleccionades.some(z => z.id === zona.id)
   }
 
-  function colorZona(zona) {
-    if (estaSeleccionada(zona)) return '#B5D4F4'
-    if (cultiusActius[zona.id]?.color) return cultiusActius[zona.id].color
-    return zona.color || '#e8e4de'
+  function getPts(zona) {
+    if (zona.forma_geojson?.points) return zona.forma_geojson.points
+    return []
+  }
+
+  function calcularBbox() {
+    const tots = []
+    if (camp.zones_geojson?.points) tots.push(...camp.zones_geojson.points)
+    zones.forEach(z => tots.push(...getPts(z)))
+    if (!tots.length) return { minX:0, minY:0, maxX:1000, maxY:700 }
+    return {
+      minX: Math.min(...tots.map(p=>p.x)) - 40,
+      minY: Math.min(...tots.map(p=>p.y)) - 40,
+      maxX: Math.max(...tots.map(p=>p.x)) + 40,
+      maxY: Math.max(...tots.map(p=>p.y)) + 40,
+    }
+  }
+
+  function calcularEscala(bbox, canvasW, canvasH) {
+    const sx = canvasW / (bbox.maxX - bbox.minX)
+    const sy = canvasH / (bbox.maxY - bbox.minY)
+    return Math.min(sx, sy)
+  }
+
+  function toCanvas(x, y, bbox, escala) {
+    return {
+      cx: (x - bbox.minX) * escala,
+      cy: (y - bbox.minY) * escala
+    }
+  }
+
+  function centroid(pts) {
+    return { x: pts.reduce((s,p)=>s+p.x,0)/pts.length, y: pts.reduce((s,p)=>s+p.y,0)/pts.length }
+  }
+
+  function ptInPoly(px, py, pts) {
+    let inside = false
+    for (let i=0,j=pts.length-1; i<pts.length; j=i++) {
+      const xi=pts[i].x,yi=pts[i].y,xj=pts[j].x,yj=pts[j].y
+      if (((yi>py)!=(yj>py))&&(px<(xj-xi)*(py-yi)/(yj-yi)+xi)) inside=!inside
+    }
+    return inside
   }
 
   function dibuixa() {
     const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
+    const container = containerRef.current
+    if (!canvas || !container) return
 
-    if (camp.zones_geojson) {
+    const W = container.clientWidth - 32
+    const H = container.clientHeight - 80
+    canvas.width = W
+    canvas.height = H
+
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0,0,W,H)
+    ctx.fillStyle = '#f8f7f4'
+    ctx.fillRect(0,0,W,H)
+
+    const bbox = calcularBbox()
+    const escala = calcularEscala(bbox, W, H)
+
+    // Perímetre del camp
+    if (camp.zones_geojson?.points) {
       const pts = camp.zones_geojson.points
       ctx.beginPath()
-      pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x*ESCALA, p.y*ESCALA) : ctx.lineTo(p.x*ESCALA, p.y*ESCALA))
+      pts.forEach((p,i) => {
+        const {cx,cy} = toCanvas(p.x,p.y,bbox,escala)
+        i===0 ? ctx.moveTo(cx,cy) : ctx.lineTo(cx,cy)
+      })
       ctx.closePath()
       ctx.fillStyle = '#f0ede8'
       ctx.fill()
@@ -35,135 +88,71 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
       ctx.stroke()
     }
 
-    zones.forEach(zona => dibuixaZona(ctx, zona))
+    // Zones
+    zones.forEach(zona => {
+      const pts = getPts(zona)
+      if (!pts.length) return
+      const sel = estaSeleccionada(zona)
+      const cultiu = cultiusActius[zona.id]
 
-    // Números de fila a dalt
-    const files = [...new Set(zones.filter(z => !z.es_permanent && z.fila).map(z => z.fila))]
-    files.forEach(fila => {
-      const am = 150 * ESCALA
-      const x0 = obtenirX0() + (fila - 1) * am
-      const y0 = obtenirY0()
-      ctx.fillStyle = '#1D9E75'
-      ctx.font = 'bold 11px system-ui'
+      ctx.beginPath()
+      pts.forEach((p,i) => {
+        const {cx,cy} = toCanvas(p.x,p.y,bbox,escala)
+        i===0 ? ctx.moveTo(cx,cy) : ctx.lineTo(cx,cy)
+      })
+      ctx.closePath()
+
+      ctx.fillStyle = sel ? '#B5D4F4' : cultiu?.color || zona.color || '#e8e4de'
+      ctx.fill()
+      ctx.strokeStyle = sel ? '#1D9E75' : 'rgba(0,0,0,0.15)'
+      ctx.lineWidth = sel ? 2 : 0.5
+      ctx.stroke()
+
+      const c = centroid(pts)
+      const {cx,cy} = toCanvas(c.x,c.y,bbox,escala)
+
+      // Codi zona
+      ctx.fillStyle = sel ? '#042C53' : '#555'
+      ctx.font = `${Math.max(8, escala*12)}px system-ui`
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.fillText(`F${fila}`, x0 + am/2, y0 - 10)
+      ctx.fillText(zona.codi, cx, cy - escala*6)
+
+      // Nom cultiu
+      if (cultiu?.nom && !sel) {
+        ctx.fillStyle = '#333'
+        ctx.font = `${Math.max(7, escala*9)}px system-ui`
+        ctx.fillText(cultiu.nom, cx, cy + escala*6)
+      }
     })
   }
 
-  function dibuixaZona(ctx, zona) {
-    const sel = estaSeleccionada(zona)
-    if (zona.es_permanent && zona.forma_geojson) {
-      dibuixaPoligon(ctx, zona, sel)
-    } else if (!zona.es_permanent && zona.fila) {
-      dibuixaRect(ctx, zona, sel)
+  function getCanvasPos(e) {
+    const canvas = canvasRef.current
+    const rect = canvas.getBoundingClientRect()
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    const cx = (e.clientX - rect.left) * scaleX
+    const cy = (e.clientY - rect.top) * scaleY
+    const bbox = calcularBbox()
+    const escala = calcularEscala(bbox, canvas.width, canvas.height)
+    return {
+      x: cx / escala + bbox.minX,
+      y: cy / escala + bbox.minY
     }
-  }
-
-  function dibuixaPoligon(ctx, zona, sel) {
-    const pts = zona.forma_geojson.points
-    ctx.beginPath()
-    pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x*ESCALA, p.y*ESCALA) : ctx.lineTo(p.x*ESCALA, p.y*ESCALA))
-    ctx.closePath()
-    ctx.fillStyle = sel ? '#B5D4F4' : zona.color || '#ddd'
-    ctx.fill()
-    ctx.strokeStyle = sel ? '#1D9E75' : 'rgba(0,0,0,0.2)'
-    ctx.lineWidth = sel ? 2.5 : 1
-    ctx.stroke()
-    const cx = pts.reduce((s,p) => s+p.x, 0) / pts.length * ESCALA
-    const cy = pts.reduce((s,p) => s+p.y, 0) / pts.length * ESCALA
-    ctx.fillStyle = 'rgba(0,0,0,0.7)'
-    ctx.font = '500 11px system-ui'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(zona.nom || zona.codi, cx, cy)
-  }
-
-  function dibuixaRect(ctx, zona, sel) {
-    const col = zona.fila - 1
-    const row = zona.posicio_inici - 1
-    const am = 150 * ESCALA
-    const al = 80 * ESCALA
-    const x0 = obtenirX0() + col * am
-    const y0 = obtenirY0() + row * al
-    const color = colorZona(zona)
-
-    ctx.fillStyle = color
-    ctx.fillRect(x0, y0, am-1, al-1)
-    ctx.strokeStyle = sel ? '#1D9E75' : 'rgba(0,0,0,0.15)'
-    ctx.lineWidth = sel ? 2 : 0.5
-    ctx.strokeRect(x0, y0, am-1, al-1)
-
-    // Text zona
-    ctx.fillStyle = sel ? '#042C53' : '#555'
-    ctx.font = '10px system-ui'
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(zona.codi, x0+am/2, y0+al/2 - 6)
-
-    // Nom cultiu
-    if (cultiusActius[zona.id]?.nom && !sel) {
-      ctx.fillStyle = '#333'
-      ctx.font = '9px system-ui'
-      ctx.fillText(cultiusActius[zona.id].nom, x0+am/2, y0+al/2 + 6)
-    }
-  }
-
-  function obtenirX0() {
-    if (camp.nom === 'Camp de la Bassa') return 750 * ESCALA
-    if (camp.nom === 'Hort') return 550 * ESCALA
-    return 100 * ESCALA
-  }
-
-  function obtenirY0() {
-    if (camp.nom === 'Camp de la Bassa') return 300 * ESCALA
-    if (camp.nom === 'Hort') return 310 * ESCALA
-    return 100 * ESCALA
-  }
-
-  function obtenirMida() {
-    if (camp.nom === 'Camp de la Bassa') return { w:2800, h:1600 }
-    if (camp.nom === 'Hort') return { w:2300, h:1000 }
-    return { w:2300, h:1300 }
-  }
-
-  function puntDinsPoligon(px, py, pts) {
-    let inside = false
-    for (let i=0, j=pts.length-1; i<pts.length; j=i++) {
-      const xi=pts[i].x, yi=pts[i].y, xj=pts[j].x, yj=pts[j].y
-      if (((yi>py) !== (yj>py)) && (px < (xj-xi)*(py-yi)/(yj-yi)+xi)) inside=!inside
-    }
-    return inside
   }
 
   function handleClick(e) {
-    const canvas = canvasRef.current
-    const rect = canvas.getBoundingClientRect()
-    const x = (e.clientX - rect.left) / ESCALA
-    const y = (e.clientY - rect.top) / ESCALA
-
-    for (const zona of zones.filter(z => z.es_permanent && z.forma_geojson)) {
-      if (puntDinsPoligon(x, y, zona.forma_geojson.points)) {
-        onToggleZona(zona)
-        return
-      }
-    }
-
-    for (const zona of zones.filter(z => !z.es_permanent && z.fila)) {
-      const col = zona.fila - 1
-      const row = zona.posicio_inici - 1
-      const am = 150
-      const al = 80
-      const x0 = obtenirX0() / ESCALA + col * am
-      const y0 = obtenirY0() / ESCALA + row * al
-      if (x >= x0 && x <= x0+am && y >= y0 && y <= y0+al) {
+    const {x, y} = getCanvasPos(e)
+    for (const zona of zones) {
+      const pts = getPts(zona)
+      if (pts.length && ptInPoly(x, y, pts)) {
         onToggleZona(zona)
         return
       }
     }
   }
 
-  // Llegenda cultius actius
   function cultiusUnics() {
     const vistos = {}
     Object.values(cultiusActius).forEach(c => {
@@ -172,37 +161,28 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     return vistos
   }
 
-  const mida = obtenirMida()
   const llegenda = cultiusUnics()
 
   return (
-    <div style={{width:'100%', height:'100%', overflow:'auto', padding:'16px'}}>
-      <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'12px', flexWrap:'wrap'}}>
+    <div ref={containerRef} style={{width:'100%', height:'100%', display:'flex', flexDirection:'column', padding:'16px', overflow:'hidden'}}>
+      <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'8px', flexWrap:'wrap', flexShrink:0}}>
         <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
           <label style={{fontSize:'12px', color:'#888', fontWeight:'500'}}>Veure estat del:</label>
-<input
+          <input
             type="date"
             value={dataConsulta || ''}
             onChange={e => {
               const val = e.target.value
-              console.log('data seleccionada:', val, 'longitud:', val.length)
-              if (val && val.length === 10) {
-                onCanviaData(val)
-              } else if (!val) {
-                onCanviaData('')
-              }
+              if (val && val.length === 10) onCanviaData && onCanviaData(val)
+              else if (!val) onCanviaData && onCanviaData('')
             }}
             onBlur={e => {
-              const val = e.target.value
-              if (val && val.length === 10) {
-                onCanviaData(val)
-              }
+              if (e.target.value.length === 10 && typeof onCanviaData === 'function') onCanviaData(e.target.value)
             }}
-            style={{padding:'5px 10px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'13px', color:'#333'}}
+            style={{padding:'5px 10px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'13px'}}
           />
-{dataConsulta && (
-            <button
-              onClick={() => typeof onCanviaData === 'function' && onCanviaData('')}
+          {dataConsulta && (
+            <button onClick={() => onCanviaData && onCanviaData('')}
               style={{padding:'5px 10px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'12px', color:'#666', background:'white', cursor:'pointer'}}>
               Avui
             </button>
@@ -212,7 +192,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
           <div style={{display:'flex', flexWrap:'wrap', gap:'8px'}}>
             {Object.entries(llegenda).map(([nom, color]) => (
               <div key={nom} style={{display:'flex', alignItems:'center', gap:'5px', fontSize:'12px', color:'#555'}}>
-                <div style={{width:'12px', height:'12px', borderRadius:'3px', background:color, border:'1px solid rgba(0,0,0,0.1)'}}></div>
+                <div style={{width:'12px', height:'12px', borderRadius:'3px', background:color, border:'1px solid rgba(0,0,0,0.1)'}}/>
                 {nom}
               </div>
             ))}
@@ -221,10 +201,8 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
       </div>
       <canvas
         ref={canvasRef}
-        width={mida.w * ESCALA}
-        height={mida.h * ESCALA}
         onClick={handleClick}
-        style={{cursor:'pointer', borderRadius:'8px', border:'1px solid #ddd', display:'block'}}
+        style={{cursor:'pointer', borderRadius:'8px', border:'1px solid #ddd', display:'block', flex:1, width:'100%'}}
       />
     </div>
   )
