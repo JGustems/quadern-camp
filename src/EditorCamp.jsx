@@ -301,7 +301,6 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
       }
     }
     if (mode !== 'moure') return
-    const {x, y} = getCanvasPos(e)
     const RADI = 15
     for (let i=0; i<perimetre.length; i++) {
       if (Math.hypot(x-perimetre[i].x, y-perimetre[i].y) < RADI) {
