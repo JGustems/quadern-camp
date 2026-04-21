@@ -25,6 +25,7 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
   const [y0Files, setY0Files] = useState(100)
   const [mousePosReal, setMousePosReal] = useState(null)
   const [canvasSize, setCanvasSize] = useState({ w: 900, h: 600 })
+  const [nomPosicions, setNomPosicions] = useState({})
 
   const COLORS = ['#FAC775','#C0DD97','#9FE1CB','#F5C4B3','#F4C0D1','#B5D4F4','#D3D1C7','#F7C1C1','#EAF3DE','#D4B5F4']
 
@@ -146,11 +147,19 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
       }
 
       const c = centroid(pts)
+      const nomPos = nomPosicions[zona.id||zona.tempId]
+      const nomX = nomPos ? nomPos.x : c.x
+      const nomY = nomPos ? nomPos.y : c.y
       ctx.fillStyle = sel ? '#0F6E56' : 'rgba(0,0,0,0.75)'
       ctx.font = sel ? 'bold 12px system-ui' : '11px system-ui'
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
-      ctx.fillText(zona.nom || zona.codi, c.x*ESCALA, c.y*ESCALA)
+      ctx.fillText(zona.nom || zona.codi, nomX*ESCALA, nomY*ESCALA)
+      // Punt de posició del nom si seleccionada
+      if (sel && mode === 'select') {
+        ctx.beginPath(); ctx.arc(nomX*ESCALA, nomY*ESCALA, 4, 0, Math.PI*2)
+        ctx.fillStyle = '#1D9E75'; ctx.fill()
+      }
 
       if (sel && (mode === 'moure' || mode === 'select')) {
         pts.forEach(p => {
@@ -205,6 +214,33 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
     if (mode === 'perimetre') { setPtsDibuix(prev => [...prev, {x,y}]); return }
     if (mode === 'zona') { setPtsDibuix(prev => [...prev, {x,y}]); return }
 
+    if (mode === 'moure') {
+      // En mode moure, clic dret sobre punt del perímetre l'elimina
+      if (e.button === 2) {
+        const RADI = 15
+        const idx = perimetre.findIndex(p => Math.hypot(x-p.x, y-p.y) < RADI)
+        if (idx >= 0 && perimetre.length > 3) {
+          setPerimetre(prev => prev.filter((_,i) => i !== idx))
+        }
+        return
+      }
+      // Clic esquerre sobre perímetre afegeix un punt entre els més propers
+      const RADI = 20
+      let millorIdx = -1, millorDist = Infinity
+      for (let i=0; i<perimetre.length; i++) {
+        const a = perimetre[i]
+        const b = perimetre[(i+1)%perimetre.length]
+        const mx = (a.x+b.x)/2, my = (a.y+b.y)/2
+        const dist = Math.hypot(x-mx, y-my)
+        if (dist < millorDist && dist < RADI*3) { millorDist = dist; millorIdx = i }
+      }
+      if (millorIdx >= 0) {
+        setPerimetre(prev => [...prev.slice(0,millorIdx+1), {x,y}, ...prev.slice(millorIdx+1)])
+        return
+      }
+      return
+    }
+
     if (mode === 'select') {
       let trobada = null
       for (let i=zones.length-1; i>=0; i--) {
@@ -212,18 +248,12 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
         if (pts.length && ptInPoly(x, y, pts)) { trobada = zones[i]; break }
       }
       if (trobada) {
-        if (e.shiftKey) {
-          // Shift+clic: afegir/treure de la selecció
-          setZonesSeleccionades(prev => {
-            const jaHi = prev.some(z => (z.id && z.id===trobada.id)||(z.tempId && z.tempId===trobada.tempId))
-            if (jaHi) return prev.filter(z => !((z.id && z.id===trobada.id)||(z.tempId && z.tempId===trobada.tempId)))
-            return [...prev, trobada]
-          })
-        } else {
-          // Clic normal: seleccionar només aquesta
-          const jaSeleccionada = estaSeleccionada(trobada)
-          setZonesSeleccionades(jaSeleccionada && zonesSeleccionades.length === 1 ? [] : [trobada])
-        }
+        // Clic simple sempre acumula — clic sobre zona ja seleccionada la deselecciona
+        setZonesSeleccionades(prev => {
+          const jaHi = prev.some(z => (z.id && z.id===trobada.id)||(z.tempId && z.tempId===trobada.tempId))
+          if (jaHi) return prev.filter(z => !((z.id && z.id===trobada.id)||(z.tempId && z.tempId===trobada.tempId)))
+          return [...prev, trobada]
+        })
         setNomZona(trobada.nom || trobada.codi || '')
         setTipusZona(trobada.es_permanent ? 'permanent' : 'cultiu')
         setColorZona(trobada.color || '#C0DD97')
@@ -257,6 +287,19 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
   }
 
   function handleMouseDown(e) {
+    const {x, y} = getCanvasPos(e)
+    // En mode select, arrossegar el punt verd del nom
+    if (mode === 'select' && zonesSeleccionades.length === 1) {
+      const zona = zonesSeleccionades[0]
+      const pts = getPts(zona)
+      const c = pts.length ? { x: pts.reduce((s,p)=>s+p.x,0)/pts.length, y: pts.reduce((s,p)=>s+p.y,0)/pts.length } : {x:0,y:0}
+      const nomPos = nomPosicions[zona.id||zona.tempId] || c
+      if (Math.hypot(x-nomPos.x, y-nomPos.y) < 15/ESCALA) {
+        setDragTarget('nom')
+        setDragPt(zona.id||zona.tempId)
+        return
+      }
+    }
     if (mode !== 'moure') return
     const {x, y} = getCanvasPos(e)
     const RADI = 15
@@ -287,6 +330,10 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
     setMousePosReal(info)
 
     if (dragPt === null) return
+    if (dragTarget === 'nom') {
+      setNomPosicions(prev => ({...prev, [dragPt]: {x,y}}))
+      return
+    }
     if (dragTarget === 'perimetre') {
       setPerimetre(prev => prev.map((p,i) => i===dragPt ? {x,y} : p))
     } else if (dragTarget === 'zona' && zonesSeleccionades.length > 0) {
@@ -435,6 +482,18 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
           ))}
           {mode === 'perimetre' && ptsDibuix.length >= 3 && (
             <button style={styles.botoAccio} onClick={tancarPerimetre}>✅ Tancar perímetre</button>
+          )}
+          {mode === 'perimetre' && ptsDibuix.length > 0 && (
+            <button style={{...styles.botoAccio, background:'#888'}}
+              onClick={() => setPtsDibuix(prev => prev.slice(0,-1))}>
+              ← Desfer punt
+            </button>
+          )}
+          {mode === 'moure' && perimetre.length > 0 && (
+            <button style={{...styles.botoAccio, background:'#e55'}}
+              onClick={() => { if(window.confirm('Eliminar tot el perímetre?')) setPerimetre([]) }}>
+              🗑 Esborrar perímetre
+            </button>
           )}
           {mode === 'zona' && ptsDibuix.length >= 3 && (
             <button style={styles.botoAccio} onClick={tancarZona}>✅ Tancar zona</button>
