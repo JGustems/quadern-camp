@@ -212,9 +212,7 @@ export default function App() {
               </button>
             )}
           <div style={{marginLeft:'auto', display:'flex', alignItems:'center', gap:'8px'}}>
-            <button onClick={() => setMostrarGestioCamps(true)} style={styles.botoCapcalera}>
-              🗺️ Camps
-            </button>
+           
             <button onClick={() => setMostrarConfig(true)} style={styles.botoCapcalera}>
               ⚙️ Config
             </button>
