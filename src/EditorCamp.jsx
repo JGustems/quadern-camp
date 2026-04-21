@@ -400,23 +400,24 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
 
   async function guardar() {
     setGuardant(true)
-    const geojson = perimetre.length >= 3 ? {type:'polygon', points:perimetre} : null
-    console.log('Guardant perímetre:', geojson)
-    const { error } = await supabase.from('camps')
-      .update({ zones_geojson: geojson })
-      .eq('id', camp.id)
-    console.log('Error perímetre:', error)
 
-    await supabase.from('zones').delete().eq('camp_id', camp.id)
-    const zonesAGuardar = zones.map(z => {
-      // Convertir files rectangulars a polígons reals
+    // Guardar perímetre
+    await supabase.from('camps').update({
+      zones_geojson: perimetre.length ? { type:'polygon', points:perimetre } : null
+    }).eq('id', camp.id)
+
+    // Separar zones existents de noves
+    const zonesExistents = zones.filter(z => z.id)
+    const zonesNoves = zones.filter(z => !z.id && z.tempId)
+
+    // UPDATE zones existents
+    for (const z of zonesExistents) {
       let forma = z.forma_geojson || null
       if (!forma && z.fila != null) {
         const pts = getPts(z)
         if (pts.length) forma = { type:'polygon', points: pts }
       }
-      return {
-        camp_id: camp.id,
+      await supabase.from('zones').update({
         codi: z.codi,
         nom: z.nom,
         tipus: z.tipus || (z.es_permanent ? 'permanent' : 'cultiu'),
@@ -429,9 +430,46 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
         llargada_m: z.llargada_m || 80,
         forma_geojson: forma,
         color: z.color || null,
-      }
-    })
-    if (zonesAGuardar.length) await supabase.from('zones').insert(zonesAGuardar)
+      }).eq('id', z.id)
+    }
+
+    // INSERT zones noves
+    if (zonesNoves.length) {
+      const zonesAInserir = zonesNoves.map(z => {
+        let forma = z.forma_geojson || null
+        if (!forma && z.fila != null) {
+          const pts = getPts(z)
+          if (pts.length) forma = { type:'polygon', points: pts }
+        }
+        return {
+          camp_id: camp.id,
+          codi: z.codi,
+          nom: z.nom,
+          tipus: z.tipus || (z.es_permanent ? 'permanent' : 'cultiu'),
+          es_permanent: z.es_permanent || false,
+          fila: z.fila || null,
+          posicio_inici: z.posicio_inici || null,
+          posicio_fi: z.posicio_fi || null,
+          tub_reg: z.tub_reg || null,
+          amplada_m: z.amplada_m || 1.5,
+          llargada_m: z.llargada_m || 80,
+          forma_geojson: forma,
+          color: z.color || null,
+        }
+      })
+      await supabase.from('zones').insert(zonesAInserir)
+    }
+
+    // DELETE zones eliminades (les que estaven a la BD però ja no són a la llista)
+    const { data: zonesActuals } = await supabase
+      .from('zones').select('id').eq('camp_id', camp.id)
+    const idsActuals = zonesActuals?.map(z => z.id) || []
+    const idsAMantenir = zonesExistents.map(z => z.id)
+    const idsAEliminar = idsActuals.filter(id => !idsAMantenir.includes(id))
+    if (idsAEliminar.length) {
+      await supabase.from('zones').delete().in('id', idsAEliminar)
+    }
+
     setGuardant(false)
     onGuardat && onGuardat()
   }
