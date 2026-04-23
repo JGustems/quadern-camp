@@ -440,9 +440,17 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
       afegirMissatge(`No es poden eliminar zones amb registres: ${ambRegistres.join(', ')}`, 'error')
       return
     }
-    const idsAEliminar = zonesSeleccionades.map(z => z.id || z.tempId)
-    setZonesAEliminar(prev => [...prev, ...idsAEliminar.filter(id => typeof id === 'number' && !String(id).startsWith('1'))])
-    setZones(prev => prev.filter(z => !idsAEliminar.includes(z.tempId)))
+    const idsExistents = zonesSeleccionades.filter(z => z.id).map(z => z.id)
+const tempIdsNoves = zonesSeleccionades.filter(z => !z.id && z.tempId).map(z => z.tempId)
+
+// Zones existents a la BD: marcar per eliminar
+if (idsExistents.length) setZonesAEliminar(prev => [...prev, ...idsExistents])
+
+// Zones noves (tempId): eliminar directament de l'estat
+setZones(prev => prev.filter(z => !tempIdsNoves.includes(z.tempId)))
+
+// Treure totes de la vista
+setZones(prev => prev.filter(z => !idsExistents.includes(z.id)))
     setZonesSeleccionades([])
     afegirMissatge(`${idsAEliminar.length} zona(es) eliminada(es)`, 'ok')
   }
