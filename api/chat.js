@@ -5,31 +5,36 @@ export default async function handler(req, res) {
 
   try {
     const { system, message } = req.body
+    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
+    const apiToken = process.env.CLOUDFLARE_API_TOKEN
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.1-8b-instruct`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: system + '\n\nPregunta: ' + message }]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1000,
-          }
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: message }
+          ]
         })
       }
     )
 
     const data = await response.json()
-    console.log('Gemini response:', JSON.stringify(data).substring(0, 500))
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ||
-                 data.error?.message ||
-                 'No he pogut generar una resposta.'
+    console.log('Cloudflare response:', JSON.stringify(data).substring(0, 300))
+    
+    if (!data.success) {
+      const errorMsg = data.errors?.[0]?.message || 'Error desconegut'
+      res.status(200).json({ text: `Error: ${errorMsg}` })
+      return
+    }
+
+    const text = data.result?.response || 'No he pogut generar una resposta.'
     res.status(200).json({ text })
   } catch (error) {
     console.error('Error:', error)
