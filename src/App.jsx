@@ -101,18 +101,37 @@ export default function App() {
     const { data } = await query
     const cultiusPerZona = {}
     const tasquesPlantacio = ['Plantar', 'Sembrar', 'Zona permanent']
+
     zones.forEach(zona => {
       const regsZona = (data || []).filter(r => r.zona_id === zona.id)
-      const plantacions = regsZona.filter(r => tasquesPlantacio.includes(r.tasques?.nom))
-      const neteges = regsZona.filter(r => r.tasques?.nom === 'Netejar')
+      const ultimaNetejar = regsZona.filter(r => r.tasques?.nom === 'Netejar')[0]
+
+      // Agafar totes les plantacions posteriors a l'últim netejar
+      const plantacions = regsZona.filter(r => {
+        if (!tasquesPlantacio.includes(r.tasques?.nom)) return false
+        if (ultimaNetejar && new Date(r.data) <= new Date(ultimaNetejar.data)) return false
+        return true
+      })
+
       if (!plantacions.length) return
-      const ultima = plantacions[0]
-      const ultimaNetejar = neteges[0]
-      if (ultimaNetejar && new Date(ultimaNetejar.data) > new Date(ultima.data)) return
-      cultiusPerZona[zona.id] = {
-        nom: ultima.cultius?.nom,
-        color: ultima.cultius?.color,
-        varietat: ultima.varietats?.nom,
+
+      // Guardar tots els cultius actius (sense duplicats de cultiu+varietat)
+      const cultiusActiusZona = []
+      const vists = new Set()
+      plantacions.forEach(p => {
+        const clau = `${p.cultius?.nom}-${p.varietats?.nom}`
+        if (!vists.has(clau) && p.cultius?.nom) {
+          vists.add(clau)
+          cultiusActiusZona.push({
+            nom: p.cultius.nom,
+            color: p.cultius.color,
+            varietat: p.varietats?.nom,
+          })
+        }
+      })
+
+      if (cultiusActiusZona.length > 0) {
+        cultiusPerZona[zona.id] = cultiusActiusZona
       }
     })
     setCultiusActius(cultiusPerZona)
