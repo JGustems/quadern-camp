@@ -5,8 +5,8 @@ export default async function handler(req, res) {
 
   try {
     const { system, message } = req.body
-    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
-    const apiToken = process.env.CLOUDFLARE_API_TOKEN
+    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID || '68dcb7e9c7575987286f795337e31adc'
+    const apiToken = process.env.CLOUDFLARE_API_TOKEN || ''
 
     const response = await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/meta/llama-3.1-8b-instruct`,
