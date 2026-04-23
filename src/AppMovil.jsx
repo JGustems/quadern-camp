@@ -77,6 +77,7 @@ export default function AppMovil({
                   cultiusActius={cultiusActius}
                   dataConsulta={dataConsulta}
                   onCanviaData={onCanviaData}
+                  modeMovil={true}
                 />
                 {zonesSeleccionades.length > 0 && (
                   <div style={styles.seleccioBar}>
