@@ -111,18 +111,20 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
       const c = centroid(pts)
       const {cx,cy} = toCanvas(c.x,c.y,bbox,escala)
 
-      // Codi zona
-      ctx.fillStyle = sel ? '#042C53' : '#555'
-      ctx.font = `${Math.max(8, escala*12)}px system-ui`
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText(zona.codi, cx, cy - escala*6)
-
-      // Nom cultiu
       if (cultiu?.nom && !sel) {
-        ctx.fillStyle = '#333'
+        // Té cultiu: mostrar nom cultiu centrat
+        ctx.fillStyle = 'rgba(0,0,0,0.7)'
+        ctx.font = `bold ${Math.max(7, escala*10)}px system-ui`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(cultiu.nom, cx, cy)
+      } else if (!cultiu && !sel) {
+        // Sense cultiu: mostrar codi petit
+        ctx.fillStyle = 'rgba(0,0,0,0.35)'
         ctx.font = `${Math.max(7, escala*9)}px system-ui`
-        ctx.fillText(cultiu.nom, cx, cy + escala*6)
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(zona.codi, cx, cy)
       }
     })
   }
