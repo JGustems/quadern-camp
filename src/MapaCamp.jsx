@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-export export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona, onSeleccionaFila, cultiusActius, dataConsulta, onCanviaData, modeMovil }) {
+export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona, onSeleccionaFila, cultiusActius, dataConsulta, onCanviaData, modeMovil }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
 
