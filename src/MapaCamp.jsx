@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 
-export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona, onSeleccionaFila, cultiusActius, dataConsulta, onCanviaData }) {
+export export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona, onSeleccionaFila, cultiusActius, dataConsulta, onCanviaData, modeMovil }) {
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
 
@@ -59,8 +59,8 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     const container = containerRef.current
     if (!canvas || !container) return
 
-    const W = container.clientWidth - 32
-    const H = container.clientHeight - 80
+    const W = container.clientWidth - (modeMovil ? 8 : 32)
+    const H = container.clientHeight - (modeMovil ? 20 : 80)
     canvas.width = W
     canvas.height = H
 
@@ -111,20 +111,20 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
       const c = centroid(pts)
       const {cx,cy} = toCanvas(c.x,c.y,bbox,escala)
 
-      if (cultiu?.nom && !sel) {
-        // Té cultiu: mostrar nom cultiu centrat
-        ctx.fillStyle = 'rgba(0,0,0,0.7)'
-        ctx.font = `bold ${Math.max(7, escala*10)}px system-ui`
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.fillText(cultiu.nom, cx, cy)
-      } else if (!cultiu && !sel) {
-        // Sense cultiu: mostrar codi petit
-        ctx.fillStyle = 'rgba(0,0,0,0.35)'
-        ctx.font = `${Math.max(7, escala*9)}px system-ui`
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-        ctx.fillText(zona.codi, cx, cy)
+      if (!modeMovil) {
+        if (cultiu?.nom && !sel) {
+          ctx.fillStyle = 'rgba(0,0,0,0.7)'
+          ctx.font = `bold ${Math.max(7, escala*10)}px system-ui`
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(cultiu.nom, cx, cy)
+        } else if (!cultiu && !sel) {
+          ctx.fillStyle = 'rgba(0,0,0,0.35)'
+          ctx.font = `${Math.max(7, escala*9)}px system-ui`
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(zona.codi, cx, cy)
+        }
       }
     })
   }
