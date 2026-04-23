@@ -13,9 +13,11 @@ export default async function handler(req, res) {
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiToken}`,
+          'X-Auth-Email': 'smetsug@gmail.com',
+          'X-Auth-Key': process.env.CLOUDFLARE_API_TOKEN,
           'Content-Type': 'application/json',
         },
+
         body: JSON.stringify({
           messages: [
             { role: 'system', content: system },
