@@ -26,25 +26,33 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
   const [mousePosReal, setMousePosReal] = useState(null)
   const [canvasSize, setCanvasSize] = useState({ w: 900, h: 600 })
   const [nomPosicions, setNomPosicions] = useState({})
+  const [missatges, setMissatges] = useState([])
+  const [zonesAEliminar, setZonesAEliminar] = useState([])
 
   const COLORS = ['#FAC775','#C0DD97','#9FE1CB','#F5C4B3','#F4C0D1','#B5D4F4','#D3D1C7','#F7C1C1','#EAF3DE','#D4B5F4']
 
   const hints = {
-    select: 'Clic per seleccionar/deseleccionar zones · Shift+clic per selecció múltiple',
-    perimetre: 'Clica per afegir punts al perímetre · "Tancar perímetre" per acabar',
-    zona: 'Clica per dibuixar una zona · "Tancar zona" per acabar (mínim 3 punts)',
+    select: 'Clic per seleccionar · clic de nou per deseleccionar',
+    perimetre: 'Clica per afegir punts · "Tancar perímetre" per acabar',
+    zona: 'Clica per dibuixar una zona · "Tancar zona" per acabar',
     files: 'Configura les files i clica "Afegir files"',
     moure: 'Arrossega els punts grocs per moure\'ls',
   }
 
   useEffect(() => { carregaDades() }, [camp])
-useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades, mode, canvasSize, nomPosicions])
+  useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades, mode, canvasSize, nomPosicions, zonesAEliminar])
 
   async function carregaDades() {
     if (!camp) return
     if (camp.zones_geojson?.points) setPerimetre(camp.zones_geojson.points)
     const { data } = await supabase.from('zones').select('*').eq('camp_id', camp.id).order('codi')
     setZones(data || [])
+  }
+
+  function afegirMissatge(text, tipus = 'info') {
+    const id = Date.now()
+    setMissatges(prev => [...prev, { id, text, tipus }])
+    setTimeout(() => setMissatges(prev => prev.filter(m => m.id !== id)), 4000)
   }
 
   function getPts(zona) {
@@ -65,7 +73,8 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
   }
 
   function calcularCanvasSize() {
-    const tots = [...perimetre, ...zones.flatMap(z => getPts(z)), ...ptsDibuix]
+    const zonesVisibles = zones.filter(z => !zonesAEliminar.includes(z.id || z.tempId))
+    const tots = [...perimetre, ...zonesVisibles.flatMap(z => getPts(z)), ...ptsDibuix]
     if (!tots.length) return { w: 900, h: 600 }
     const maxX = Math.max(...tots.map(p => p.x)) * ESCALA + 80
     const maxY = Math.max(...tots.map(p => p.y)) * ESCALA + 80
@@ -74,6 +83,10 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
 
   function estaSeleccionada(zona) {
     return zonesSeleccionades.some(z => (z.id && z.id === zona.id) || (z.tempId && z.tempId === zona.tempId))
+  }
+
+  function estaEliminada(zona) {
+    return zonesAEliminar.includes(zona.id || zona.tempId)
   }
 
   function centroid(pts) {
@@ -102,13 +115,11 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
     ctx.fillStyle = '#f0ede8'
     ctx.fillRect(0,0,canvas.width,canvas.height)
 
-    // Grid
     ctx.strokeStyle = 'rgba(0,0,0,0.05)'
     ctx.lineWidth = 1
     for (let x=0; x<canvas.width; x+=50) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke() }
     for (let y=0; y<canvas.height; y+=50) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke() }
 
-    // Perímetre
     if (perimetre.length > 1) {
       ctx.beginPath()
       perimetre.forEach((p,i) => i===0 ? ctx.moveTo(p.x*ESCALA,p.y*ESCALA) : ctx.lineTo(p.x*ESCALA,p.y*ESCALA))
@@ -120,8 +131,7 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
       ctx.stroke()
     }
 
-    // Zones
-    zones.forEach(zona => {
+    zones.filter(z => !estaEliminada(z)).forEach(zona => {
       const pts = getPts(zona)
       if (!pts.length) return
       const sel = estaSeleccionada(zona)
@@ -155,7 +165,7 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
       ctx.textAlign = 'center'
       ctx.textBaseline = 'middle'
       ctx.fillText(zona.nom || zona.codi, nomX*ESCALA, nomY*ESCALA)
-      // Punt de posició del nom si seleccionada
+
       if (sel && mode === 'select') {
         ctx.beginPath(); ctx.arc(nomX*ESCALA, nomY*ESCALA, 4, 0, Math.PI*2)
         ctx.fillStyle = '#1D9E75'; ctx.fill()
@@ -170,7 +180,6 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
       }
     })
 
-    // Dibuix en curs
     if (ptsDibuix.length) {
       ctx.beginPath()
       ptsDibuix.forEach((p,i) => i===0 ? ctx.moveTo(p.x*ESCALA,p.y*ESCALA) : ctx.lineTo(p.x*ESCALA,p.y*ESCALA))
@@ -187,7 +196,6 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
       })
     }
 
-    // Punts perímetre
     if (mode === 'perimetre' || mode === 'moure') {
       perimetre.forEach(p => {
         ctx.beginPath(); ctx.arc(p.x*ESCALA,p.y*ESCALA,5,0,Math.PI*2)
@@ -215,7 +223,6 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
     if (mode === 'zona') { setPtsDibuix(prev => [...prev, {x,y}]); return }
 
     if (mode === 'moure') {
-      // En mode moure, clic dret sobre punt del perímetre l'elimina
       if (e.button === 2) {
         const RADI = 15
         const idx = perimetre.findIndex(p => Math.hypot(x-p.x, y-p.y) < RADI)
@@ -224,7 +231,6 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
         }
         return
       }
-      // Clic esquerre sobre perímetre afegeix un punt entre els més propers
       const RADI = 20
       let millorIdx = -1, millorDist = Infinity
       for (let i=0; i<perimetre.length; i++) {
@@ -244,11 +250,11 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
     if (mode === 'select') {
       let trobada = null
       for (let i=zones.length-1; i>=0; i--) {
+        if (estaEliminada(zones[i])) continue
         const pts = getPts(zones[i])
         if (pts.length && ptInPoly(x, y, pts)) { trobada = zones[i]; break }
       }
       if (trobada) {
-        // Clic simple sempre acumula — clic sobre zona ja seleccionada la deselecciona
         setZonesSeleccionades(prev => {
           const jaHi = prev.some(z => (z.id && z.id===trobada.id)||(z.tempId && z.tempId===trobada.tempId))
           if (jaHi) return prev.filter(z => !((z.id && z.id===trobada.id)||(z.tempId && z.tempId===trobada.tempId)))
@@ -267,15 +273,22 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
     if (ptsDibuix.length < 3) return
     setPerimetre(ptsDibuix)
     setPtsDibuix([])
+    afegirMissatge('Perímetre definit correctament', 'ok')
   }
 
   function tancarZona() {
     if (ptsDibuix.length < 3) return
+    const codi = nomZona || `Z${zones.filter(z=>!estaEliminada(z)).length+1}`
+    const duplicat = zones.find(z => !estaEliminada(z) && (z.codi===codi || z.nom===codi))
+    if (duplicat) {
+      afegirMissatge(`Ja existeix una zona amb el nom "${codi}"`, 'error')
+      return
+    }
     const novaZona = {
       tempId: Date.now(),
       camp_id: camp.id,
-      codi: nomZona || `Z${zones.length+1}`,
-      nom: nomZona || `Zona ${zones.length+1}`,
+      codi,
+      nom: codi,
       tipus: tipusZona,
       es_permanent: tipusZona !== 'cultiu',
       color: colorZona,
@@ -284,15 +297,15 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
     setZones(prev => [...prev, novaZona])
     setZonesSeleccionades([novaZona])
     setPtsDibuix([])
+    afegirMissatge(`Zona "${codi}" creada`, 'ok')
   }
 
   function handleMouseDown(e) {
     const {x, y} = getCanvasPos(e)
-    // En mode select, arrossegar el punt verd del nom
     if (mode === 'select' && zonesSeleccionades.length === 1) {
       const zona = zonesSeleccionades[0]
       const pts = getPts(zona)
-      const c = pts.length ? { x: pts.reduce((s,p)=>s+p.x,0)/pts.length, y: pts.reduce((s,p)=>s+p.y,0)/pts.length } : {x:0,y:0}
+      const c = pts.length ? centroid(pts) : {x:0,y:0}
       const nomPos = nomPosicions[zona.id||zona.tempId] || c
       if (Math.hypot(x-nomPos.x, y-nomPos.y) < 15/ESCALA) {
         setDragTarget('nom')
@@ -353,12 +366,16 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
 
   function afegirFiles() {
     const novesZones = []
+    const errors = []
     for (let col=0; col<numFiles; col++) {
       for (let row=0; row<numPosicions; row++) {
         const fila = filaInici + col
         const pos = row + 1
         const codi = (fila*10+pos).toString()
-        if (!zones.find(z => z.codi===codi && !z.es_permanent)) {
+        const jaExisteix = zones.find(z => z.codi===codi && !z.es_permanent && !estaEliminada(z))
+        if (jaExisteix) {
+          errors.push(codi)
+        } else {
           novesZones.push({
             tempId: Date.now()+col*100+row,
             camp_id: camp.id, codi, nom: codi,
@@ -370,10 +387,29 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
         }
       }
     }
-    setZones(prev => [...prev, ...novesZones])
+    if (errors.length > 0) {
+      afegirMissatge(`Zones ja existents (no afegides): ${errors.join(', ')}`, 'warn')
+    }
+    if (novesZones.length > 0) {
+      setZones(prev => [...prev, ...novesZones])
+      afegirMissatge(`${novesZones.length} files afegides correctament`, 'ok')
+    }
   }
 
   function actualitzarZonesSeleccionades() {
+    if (zonesSeleccionades.length === 1) {
+      const codi = nomZona
+      const duplicat = zones.find(z =>
+        !estaEliminada(z) &&
+        (z.codi===codi || z.nom===codi) &&
+        z.id !== zonesSeleccionades[0].id &&
+        z.tempId !== zonesSeleccionades[0].tempId
+      )
+      if (duplicat) {
+        afegirMissatge(`Ja existeix una zona amb el nom "${codi}"`, 'error')
+        return
+      }
+    }
     setZones(prev => prev.map(z => {
       if (estaSeleccionada(z)) {
         return {
@@ -386,67 +422,98 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
       }
       return z
     }))
+    afegirMissatge('Zona actualitzada', 'ok')
   }
 
-  function eliminarZonesSeleccionades() {
-    setZones(prev => prev.filter(z => !estaSeleccionada(z)))
+  async function eliminarZonesSeleccionades() {
+    const ambRegistres = []
+    for (const zona of zonesSeleccionades) {
+      if (zona.id) {
+        const { count } = await supabase
+          .from('registres')
+          .select('id', { count: 'exact', head: true })
+          .eq('zona_id', zona.id)
+        if (count > 0) ambRegistres.push(`${zona.nom||zona.codi} (${count} registres)`)
+      }
+    }
+    if (ambRegistres.length > 0) {
+      afegirMissatge(`No es poden eliminar zones amb registres: ${ambRegistres.join(', ')}`, 'error')
+      return
+    }
+    const idsAEliminar = zonesSeleccionades.map(z => z.id || z.tempId)
+    setZonesAEliminar(prev => [...prev, ...idsAEliminar.filter(id => typeof id === 'number' && !String(id).startsWith('1'))])
+    setZones(prev => prev.filter(z => !idsAEliminar.includes(z.tempId)))
     setZonesSeleccionades([])
+    afegirMissatge(`${idsAEliminar.length} zona(es) eliminada(es)`, 'ok')
   }
 
   async function guardar() {
     setGuardant(true)
-    await supabase.from('camps').update({
-      zones_geojson: perimetre.length ? {type:'polygon', points:perimetre} : null
-    }).eq('id', camp.id)
+    setMissatges([])
 
-    const zonesExistents = zones.filter(z => z.id)
-    const zonesNoves = zones.filter(z => !z.id && z.tempId)
+    try {
+      // Guardar perímetre
+      await supabase.from('camps').update({
+        zones_geojson: perimetre.length ? {type:'polygon', points:perimetre} : null
+      }).eq('id', camp.id)
 
-    for (const z of zonesExistents) {
-      let forma = z.forma_geojson || null
-      if (!forma && z.fila != null) {
-        const pts = getPts(z)
-        if (pts.length) forma = { type:'polygon', points: pts }
+      // Eliminar zones marcades per eliminar
+      if (zonesAEliminar.length) {
+        await supabase.from('zones').delete().in('id', zonesAEliminar)
       }
-      await supabase.from('zones').update({
-        codi: z.codi, nom: z.nom,
-        tipus: z.tipus || (z.es_permanent ? 'permanent' : 'cultiu'),
-        es_permanent: z.es_permanent || false,
-        fila: z.fila || null, posicio_inici: z.posicio_inici || null,
-        posicio_fi: z.posicio_fi || null, tub_reg: z.tub_reg || null,
-        amplada_m: z.amplada_m || 1.5, llargada_m: z.llargada_m || 80,
-        forma_geojson: forma, color: z.color || null,
-      }).eq('id', z.id)
-    }
 
-    if (zonesNoves.length) {
-      const zonesAInserir = zonesNoves.map(z => {
+      // Zones existents a la BD — UPDATE
+      const zonesExistents = zones.filter(z => z.id && !zonesAEliminar.includes(z.id))
+      for (const z of zonesExistents) {
         let forma = z.forma_geojson || null
         if (!forma && z.fila != null) {
           const pts = getPts(z)
           if (pts.length) forma = { type:'polygon', points: pts }
         }
-        return {
-          camp_id: camp.id, codi: z.codi, nom: z.nom,
+        await supabase.from('zones').update({
+          codi: z.codi, nom: z.nom,
           tipus: z.tipus || (z.es_permanent ? 'permanent' : 'cultiu'),
           es_permanent: z.es_permanent || false,
           fila: z.fila || null, posicio_inici: z.posicio_inici || null,
           posicio_fi: z.posicio_fi || null, tub_reg: z.tub_reg || null,
           amplada_m: z.amplada_m || 1.5, llargada_m: z.llargada_m || 80,
           forma_geojson: forma, color: z.color || null,
+        }).eq('id', z.id)
+      }
+
+      // Zones noves — INSERT
+      const zonesNoves = zones.filter(z => z.tempId && !z.id)
+      if (zonesNoves.length) {
+        const zonesAInserir = zonesNoves.map(z => {
+          let forma = z.forma_geojson || null
+          if (!forma && z.fila != null) {
+            const pts = getPts(z)
+            if (pts.length) forma = { type:'polygon', points: pts }
+          }
+          return {
+            camp_id: camp.id, codi: z.codi, nom: z.nom,
+            tipus: z.tipus || (z.es_permanent ? 'permanent' : 'cultiu'),
+            es_permanent: z.es_permanent || false,
+            fila: z.fila || null, posicio_inici: z.posicio_inici || null,
+            posicio_fi: z.posicio_fi || null, tub_reg: z.tub_reg || null,
+            amplada_m: z.amplada_m || 1.5, llargada_m: z.llargada_m || 80,
+            forma_geojson: forma, color: z.color || null,
+          }
+        })
+        const { error } = await supabase.from('zones').insert(zonesAInserir)
+        if (error) {
+          afegirMissatge(`Error en guardar zones noves: ${error.message}`, 'error')
+          setGuardant(false)
+          return
         }
-      })
-      await supabase.from('zones').insert(zonesAInserir)
+      }
+
+      afegirMissatge('Tot guardat correctament ✅', 'ok')
+      setTimeout(() => { onGuardat && onGuardat() }, 1500)
+    } catch (err) {
+      afegirMissatge(`Error inesperat: ${err.message}`, 'error')
     }
-
-    const { data: zonesActuals } = await supabase.from('zones').select('id').eq('camp_id', camp.id)
-    const idsActuals = zonesActuals?.map(z => z.id) || []
-    const idsAMantenir = zonesExistents.map(z => z.id)
-    const idsAEliminar = idsActuals.filter(id => !idsAMantenir.includes(id))
-    if (idsAEliminar.length) await supabase.from('zones').delete().in('id', idsAEliminar)
-
     setGuardant(false)
-    onGuardat && onGuardat()
   }
 
   return (
@@ -464,6 +531,21 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
             <button style={styles.botoTancar} onClick={onTancar}>✕</button>
           </div>
         </div>
+
+        {/* Missatges */}
+        {missatges.length > 0 && (
+          <div style={{padding:'6px 16px', display:'flex', flexDirection:'column', gap:'4px', flexShrink:0}}>
+            {missatges.map(m => (
+              <div key={m.id} style={{
+                padding:'6px 12px', borderRadius:'6px', fontSize:'12px', fontWeight:'500',
+                background: m.tipus==='ok'?'#E1F5EE':m.tipus==='error'?'#FEE2E2':'#FEF9C3',
+                color: m.tipus==='ok'?'#0F6E56':m.tipus==='error'?'#991B1B':'#854D0E',
+              }}>
+                {m.text}
+              </div>
+            ))}
+          </div>
+        )}
 
         <div style={styles.toolbar}>
           {[
@@ -522,7 +604,7 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
           <div style={styles.panell}>
             {mode === 'files' && (
               <div>
-                <div style={styles.seccio}>Files estàndard</div>
+                <div style={styles.seccio}>Files estàndard (1,5m × 80cm)</div>
                 <div style={styles.grup}>
                   <label style={styles.label}>Fila inicial</label>
                   <input type="number" style={styles.input} value={filaInici} min="1"
@@ -539,12 +621,12 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
                     onChange={e => setNumPosicions(parseInt(e.target.value)||1)}/>
                 </div>
                 <div style={styles.grup}>
-                  <label style={styles.label}>X inici</label>
+                  <label style={styles.label}>X inici (cm)</label>
                   <input type="number" style={styles.input} value={x0Files}
                     onChange={e => setX0Files(parseInt(e.target.value)||0)}/>
                 </div>
                 <div style={styles.grup}>
-                  <label style={styles.label}>Y inici</label>
+                  <label style={styles.label}>Y inici (cm)</label>
                   <input type="number" style={styles.input} value={y0Files}
                     onChange={e => setY0Files(parseInt(e.target.value)||0)}/>
                 </div>
@@ -560,7 +642,7 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
                 {zonesSeleccionades.length > 0 ? (
                   <div>
                     <div style={styles.seccio}>
-                      {zonesSeleccionades.length === 1 ? 'Zona seleccionada' : `${zonesSeleccionades.length} zones seleccionades`}
+                      {zonesSeleccionades.length === 1 ? 'Zona seleccionada' : `${zonesSeleccionades.length} zones`}
                     </div>
                     {zonesSeleccionades.length === 1 && (
                       <div style={styles.grup}>
@@ -600,9 +682,7 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
                     <button style={{...styles.botoPrimari, background:'#888', marginTop:'6px'}}
                       onClick={() => {
                         const nousPosicions = {...nomPosicions}
-                        zonesSeleccionades.forEach(z => {
-                          delete nousPosicions[z.id||z.tempId]
-                        })
+                        zonesSeleccionades.forEach(z => delete nousPosicions[z.id||z.tempId])
                         setNomPosicions(nousPosicions)
                       }}>
                       ↺ Centrar text
@@ -648,9 +728,16 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
                 )}
 
                 <div style={{marginTop:'16px'}}>
-                  <div style={styles.seccio}>Zones ({zones.length})</div>
+                  <div style={styles.seccio}>
+                    Zones ({zones.filter(z => !estaEliminada(z)).length})
+                    {zonesAEliminar.length > 0 && (
+                      <span style={{color:'#e55', marginLeft:'6px'}}>
+                        · {zonesAEliminar.length} per eliminar
+                      </span>
+                    )}
+                  </div>
                   <div style={{maxHeight:'200px', overflowY:'auto'}}>
-                    {zones.map(z => (
+                    {zones.filter(z => !estaEliminada(z)).map(z => (
                       <div key={z.id||z.tempId}
                         onClick={() => {
                           setZonesSeleccionades([z])
@@ -666,6 +753,7 @@ useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades,
                           background:z.color||'#ddd',flexShrink:0}}/>
                         <span style={{fontSize:'12px', color: estaSeleccionada(z)?'#0F6E56':'#333', flex:1}}>
                           {z.nom||z.codi}
+                          {z.tempId && !z.id && <span style={{fontSize:'10px', color:'#1D9E75', marginLeft:'4px'}}>nou</span>}
                         </span>
                         {estaSeleccionada(z) && <span style={{fontSize:'11px', color:'#1D9E75'}}>✓</span>}
                         <span style={{fontSize:'10px',color:'#aaa'}}>
