@@ -213,36 +213,65 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
 
       // Text
       if (!modeMovil) {
-        // Calcular mida màxima del text que cap dins el polígon
-        const amplada = Math.sqrt(
-          Math.pow((Math.max(...pts.map(p=>p.x)) - Math.min(...pts.map(p=>p.x))) * escala, 2)
-        )
-        const alcada = Math.sqrt(
-          Math.pow((Math.max(...pts.map(p=>p.y)) - Math.min(...pts.map(p=>p.y))) * escala, 2)
-        )
-        const midaMax = Math.min(amplada * 0.8, alcada * 0.4)
-        const midaText = Math.min(Math.max(8, midaMax * 0.35), 14)
+        const c = centroid(pts)
+        const {cx,cy} = toCanvas(c.x,c.y,bbox,escala)
+        const amplada = (Math.max(...pts.map(p=>p.x)) - Math.min(...pts.map(p=>p.x))) * escala
+        const alcada = (Math.max(...pts.map(p=>p.y)) - Math.min(...pts.map(p=>p.y))) * escala
+        const midaText = Math.min(Math.max(8, Math.min(amplada, alcada) * 0.25), 13)
 
-        if (cultiu?.nom && !sel) {
-          ctx.fillStyle = 'rgba(0,0,0,0.7)'
+        if (sel) {
+          ctx.fillStyle = '#042C53'
           ctx.font = `bold ${midaText}px system-ui`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
-          // Tallar el text si és massa llarg
-          const textMax = amplada * 0.85
-          let text = cultiu.nom
-          ctx.font = `bold ${midaText}px system-ui`
-          while (ctx.measureText(text).width > textMax && text.length > 3) {
-            text = text.slice(0, -1)
-          }
-          if (text !== cultiu.nom) text += '…'
-          ctx.fillText(text, cx, cy)
-        } else if (!cultiu && !sel) {
-          ctx.fillStyle = 'rgba(0,0,0,0.35)'
+          ctx.fillText(zona.codi, cx, cy)
+        } else if (cultiusZona.length === 0) {
+          ctx.fillStyle = 'rgba(0,0,0,0.3)'
           ctx.font = `${midaText}px system-ui`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
           ctx.fillText(zona.codi, cx, cy)
+        } else if (cultiusZona.length === 1) {
+          ctx.fillStyle = 'rgba(0,0,0,0.7)'
+          ctx.font = `bold ${midaText}px system-ui`
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          let text = cultiusZona[0].nom
+          while (ctx.measureText(text).width > amplada * 0.85 && text.length > 3) {
+            text = text.slice(0,-1)
+          }
+          if (text !== cultiusZona[0].nom) text += '…'
+          ctx.fillText(text, cx, cy)
+        } else if (cultiusZona.length === 2) {
+          // Dos cultius — text a cada triangle
+          const minX = Math.min(...pts.map(p=>p.x)) * escala + (bbox ? -bbox.minX*escala : 0)
+          const maxX = Math.max(...pts.map(p=>p.x)) * escala + (bbox ? -bbox.minX*escala : 0)
+          const minY = Math.min(...pts.map(p=>p.y)) * escala + (bbox ? -bbox.minY*escala : 0)
+          const maxY = Math.max(...pts.map(p=>p.y)) * escala + (bbox ? -bbox.minY*escala : 0)
+          const midaTextPetit = Math.max(7, midaText * 0.8)
+          ctx.font = `${midaTextPetit}px system-ui`
+          ctx.fillStyle = 'rgba(0,0,0,0.7)'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          const {cx: cx1, cy: cy1} = toCanvas(
+            Math.min(...pts.map(p=>p.x)) + (Math.max(...pts.map(p=>p.x))-Math.min(...pts.map(p=>p.x)))*0.3,
+            Math.min(...pts.map(p=>p.y)) + (Math.max(...pts.map(p=>p.y))-Math.min(...pts.map(p=>p.y)))*0.3,
+            bbox, escala
+          )
+          const {cx: cx2, cy: cy2} = toCanvas(
+            Math.min(...pts.map(p=>p.x)) + (Math.max(...pts.map(p=>p.x))-Math.min(...pts.map(p=>p.x)))*0.7,
+            Math.min(...pts.map(p=>p.y)) + (Math.max(...pts.map(p=>p.y))-Math.min(...pts.map(p=>p.y)))*0.7,
+            bbox, escala
+          )
+          ctx.fillText(cultiusZona[0].nom.substring(0,6), cx1, cy1)
+          ctx.fillText(cultiusZona[1].nom.substring(0,6), cx2, cy2)
+        } else {
+          // 3+ cultius
+          ctx.fillStyle = 'rgba(0,0,0,0.5)'
+          ctx.font = `${Math.max(7, midaText*0.8)}px system-ui`
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.fillText(`${cultiusZona.length} cultius`, cx, cy)
         }
       }
     })
