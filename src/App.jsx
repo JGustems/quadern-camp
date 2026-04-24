@@ -371,12 +371,11 @@ export default function App() {
           onActualitzar={() => carregaPobles()}
         />
       )}
-      {mostrarGestioRegistres && (
-        <GestioRegistres onTancar={() => setMostrarGestioRegistres(false)} />
-      )}
+      
       {mostrarGestioUsuaris && (
         <GestioUsuaris onTancar={() => setMostrarGestioUsuaris(false)} />
       )}
+      
       {mostrarFormulari && (
         <FormulariTasca
           zones={zonesSeleccionades}
@@ -388,6 +387,9 @@ export default function App() {
             carregaCultiusActius(zones, dataConsulta || null)
           }}
         />
+      )}
+      {mostrarGestioRegistres && (
+        <GestioRegistres onTancar={() => setMostrarGestioRegistres(false)} />
       )}
     </div>
   )
