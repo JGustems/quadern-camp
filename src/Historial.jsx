@@ -61,23 +61,35 @@ function cultiusActius() {
     const resultat = {}
     zones.forEach(zona => {
       const regsZona = registres.filter(r => r.zona_id === zona.id)
-      const plantacions = regsZona.filter(r => tasquesPlantacio.includes(r.tasques?.nom))
-      const neteges = regsZona.filter(r => r.tasques?.nom === 'Netejar')
+      const ultimaNetejar = regsZona.filter(r => r.tasques?.nom === 'Netejar')[0]
+      const plantacions = regsZona.filter(r => {
+        if (!tasquesPlantacio.includes(r.tasques?.nom)) return false
+        if (ultimaNetejar && new Date(r.data) <= new Date(ultimaNetejar.data)) return false
+        return true
+      })
       if (!plantacions.length) return
-      const ultima = plantacions[0]
-      const ultimaNetejar = neteges[0]
-      if (ultimaNetejar && new Date(ultimaNetejar.data) > new Date(ultima.data)) return
-      const clau = `${ultima.cultius?.nom}-${ultima.varietats?.nom}`
-      if (!resultat[clau]) {
-        resultat[clau] = {
-          nom: ultima.cultius?.nom,
-          varietat: ultima.varietats?.nom,
-          data: ultima.data,
-          zones: [zona.codi]
+
+      // Agrupar per cultiu (no varietat)
+      const cultiusVists = new Set()
+      plantacions.forEach(p => {
+        const nomCultiu = p.cultius?.nom
+        if (!cultiusVists.has(nomCultiu) && nomCultiu) {
+          cultiusVists.add(nomCultiu)
+          const clau = nomCultiu
+          if (!resultat[clau]) {
+            resultat[clau] = {
+              nom: nomCultiu,
+              varietat: p.varietats?.nom,
+              data: p.data,
+              zones: [zona.codi]
+            }
+          } else {
+            if (!resultat[clau].zones.includes(zona.codi)) {
+              resultat[clau].zones.push(zona.codi)
+            }
+          }
         }
-      } else {
-        resultat[clau].zones.push(zona.codi)
-      }
+      })
     })
     return Object.values(resultat)
   }
