@@ -69,24 +69,21 @@ function cultiusActius() {
       })
       if (!plantacions.length) return
 
-      // Agrupar per cultiu (no varietat)
-      const cultiusVists = new Set()
       plantacions.forEach(p => {
         const nomCultiu = p.cultius?.nom
-        if (!cultiusVists.has(nomCultiu) && nomCultiu) {
-          cultiusVists.add(nomCultiu)
-          const clau = nomCultiu
-          if (!resultat[clau]) {
-            resultat[clau] = {
-              nom: nomCultiu,
-              varietat: p.varietats?.nom,
-              data: p.data,
-              zones: [zona.codi]
-            }
-          } else {
-            if (!resultat[clau].zones.includes(zona.codi)) {
-              resultat[clau].zones.push(zona.codi)
-            }
+        const nomVarietat = p.varietats?.nom
+        if (!nomCultiu) return
+        const clau = `${nomCultiu}-${nomVarietat}`
+        if (!resultat[clau]) {
+          resultat[clau] = {
+            nom: nomCultiu,
+            varietat: nomVarietat && nomVarietat !== '-' ? nomVarietat : null,
+            data: p.data,
+            zones: [zona.codi]
+          }
+        } else {
+          if (!resultat[clau].zones.includes(zona.codi)) {
+            resultat[clau].zones.push(zona.codi)
           }
         }
       })
