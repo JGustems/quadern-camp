@@ -47,6 +47,12 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
     if (camp.zones_geojson?.points) setPerimetre(camp.zones_geojson.points)
     const { data } = await supabase.from('zones').select('*').eq('camp_id', camp.id).order('codi')
     setZones(data || [])
+    // Carregar posicions de text guardades
+    const posicions = {}
+    ;(data || []).forEach(z => {
+      if (z.nom_posicio) posicions[z.id] = z.nom_posicio
+    })
+    setNomPosicions(posicions)
   }
 
   function afegirMissatge(text, tipus = 'info') {
@@ -479,14 +485,15 @@ setZones(prev => prev.filter(z => !idsExistents.includes(z.id)))
           if (pts.length) forma = { type:'polygon', points: pts }
         }
         await supabase.from('zones').update({
-          codi: z.codi, nom: z.nom,
-          tipus: z.tipus || (z.es_permanent ? 'permanent' : 'cultiu'),
-          es_permanent: z.es_permanent || false,
-          fila: z.fila || null, posicio_inici: z.posicio_inici || null,
-          posicio_fi: z.posicio_fi || null, tub_reg: z.tub_reg || null,
-          amplada_m: z.amplada_m || 1.5, llargada_m: z.llargada_m || 80,
-          forma_geojson: forma, color: z.color || null,
-        }).eq('id', z.id)
+        codi: z.codi, nom: z.nom,
+        tipus: z.tipus || (z.es_permanent ? 'permanent' : 'cultiu'),
+        es_permanent: z.es_permanent || false,
+        fila: z.fila || null, posicio_inici: z.posicio_inici || null,
+        posicio_fi: z.posicio_fi || null, tub_reg: z.tub_reg || null,
+        amplada_m: z.amplada_m || 1.5, llargada_m: z.llargada_m || 80,
+        forma_geojson: forma, color: z.color || null,
+        nom_posicio: nomPosicions[z.id] || null,
+      }).eq('id', z.id)
       }
 
       // Zones noves — INSERT
@@ -506,8 +513,9 @@ setZones(prev => prev.filter(z => !idsExistents.includes(z.id)))
             posicio_fi: z.posicio_fi || null, tub_reg: z.tub_reg || null,
             amplada_m: z.amplada_m || 1.5, llargada_m: z.llargada_m || 80,
             forma_geojson: forma, color: z.color || null,
-          }
-        })
+          nom_posicio: nomPosicions[z.tempId] || null,
+        }
+      })
         const { error } = await supabase.from('zones').insert(zonesAInserir)
         if (error) {
           afegirMissatge(`Error en guardar zones noves: ${error.message}`, 'error')
