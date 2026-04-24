@@ -671,13 +671,19 @@ setZones(prev => prev.filter(z => !idsExistents.includes(z.id)))
                     </div>
                     <div style={styles.grup}>
                       <label style={styles.label}>Color</label>
-                      <div style={{display:'flex', flexWrap:'wrap', gap:'4px'}}>
+                      <div style={{display:'flex', flexWrap:'wrap', gap:'4px', marginBottom:'6px'}}>
                         {COLORS.map(c => (
                           <div key={c} onClick={() => setColorZona(c)}
                             style={{width:'22px', height:'22px', borderRadius:'4px', background:c,
                               border: colorZona===c?'2.5px solid #1D9E75':'1px solid rgba(0,0,0,0.15)',
                               cursor:'pointer'}}/>
                         ))}
+                      </div>
+                      <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                        <input type="color" value={colorZona}
+                          onChange={e => setColorZona(e.target.value)}
+                          style={{width:'32px', height:'32px', padding:'0', border:'1px solid #ddd', borderRadius:'4px', cursor:'pointer'}}/>
+                        <span style={{fontSize:'11px', color:'#888'}}>O tria color lliure</span>
                       </div>
                     </div>
                     <button style={styles.botoPrimari} onClick={actualitzarZonesSeleccionades}>
@@ -720,13 +726,19 @@ setZones(prev => prev.filter(z => !idsExistents.includes(z.id)))
                     </div>
                     <div style={styles.grup}>
                       <label style={styles.label}>Color</label>
-                      <div style={{display:'flex', flexWrap:'wrap', gap:'4px'}}>
+                      <div style={{display:'flex', flexWrap:'wrap', gap:'4px', marginBottom:'6px'}}>
                         {COLORS.map(c => (
                           <div key={c} onClick={() => setColorZona(c)}
                             style={{width:'22px', height:'22px', borderRadius:'4px', background:c,
                               border: colorZona===c?'2.5px solid #1D9E75':'1px solid rgba(0,0,0,0.15)',
                               cursor:'pointer'}}/>
                         ))}
+                      </div>
+                      <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                        <input type="color" value={colorZona}
+                          onChange={e => setColorZona(e.target.value)}
+                          style={{width:'32px', height:'32px', padding:'0', border:'1px solid #ddd', borderRadius:'4px', cursor:'pointer'}}/>
+                        <span style={{fontSize:'11px', color:'#888'}}>O tria color lliure</span>
                       </div>
                     </div>
                     <div style={{fontSize:'11px', color:'#aaa', marginTop:'8px'}}>
