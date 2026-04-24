@@ -10,7 +10,7 @@ import Configuracio from './Configuracio.jsx'
 import GestioCamps from './GestioCamps.jsx'
 import GestioUsuaris from './GestioUsuaris.jsx'
 import XatIA from './XatIA.jsx'
-import GestioUsuaris from './GestioUsuaris.jsx'
+import GestioRegistres from './GestioRegistres.jsx'
 
 
 export default function App() {
