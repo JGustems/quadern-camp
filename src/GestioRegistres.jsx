@@ -327,4 +327,10 @@ const styles = {
   formulari: { width:'300px', borderLeft:'1px solid #eee', padding:'16px', overflowY:'auto', flexShrink:0 },
   formTitol: { fontSize:'14px', fontWeight:'600', color:'#333', marginBottom:'14px' },
   grup: { marginBottom:'10px' },
-  label: { display:'block', fontSize:'11px', color:'#888', marginBottom:'4px'
+  label: { display:'block', fontSize:'11px', color:'#888', marginBottom:'4px' },
+  input: { width:'100%', padding:'7px 10px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'13px', boxSizing:'border-box' },
+  fila2: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px' },
+  botoPrimari: { flex:1, padding:'9px', background:'#1D9E75', color:'white', border:'none', borderRadius:'8px', cursor:'pointer', fontSize:'13px', fontWeight:'500' },
+  botoCancel: { padding:'9px 16px', background:'white', color:'#666', border:'1px solid #ddd', borderRadius:'8px', cursor:'pointer', fontSize:'13px' },
+  centrat: { textAlign:'center', color:'#aaa', padding:'40px', fontSize:'14px' },
+}
