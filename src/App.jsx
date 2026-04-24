@@ -115,15 +115,15 @@ export default function App() {
 
       if (!plantacions.length) return
 
-      // Guardar tots els cultius actius (sense duplicats de cultiu+varietat)
+      // Agrupar per cultiu (no per varietat) — dues varietats del mateix cultiu = 1 color
       const cultiusActiusZona = []
-      const vists = new Set()
+      const cultiusVists = new Set()
       plantacions.forEach(p => {
-        const clau = `${p.cultius?.nom}-${p.varietats?.nom}`
-        if (!vists.has(clau) && p.cultius?.nom) {
-          vists.add(clau)
+        const nomCultiu = p.cultius?.nom
+        if (!cultiusVists.has(nomCultiu) && nomCultiu) {
+          cultiusVists.add(nomCultiu)
           cultiusActiusZona.push({
-            nom: p.cultius.nom,
+            nom: nomCultiu,
             color: p.cultius.color,
             varietat: p.varietats?.nom,
           })
