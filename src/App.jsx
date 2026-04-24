@@ -10,6 +10,8 @@ import Configuracio from './Configuracio.jsx'
 import GestioCamps from './GestioCamps.jsx'
 import GestioUsuaris from './GestioUsuaris.jsx'
 import XatIA from './XatIA.jsx'
+import GestioUsuaris from './GestioUsuaris.jsx'
+
 
 export default function App() {
   const [usuari, setUsuari] = useState(null)
@@ -30,6 +32,8 @@ export default function App() {
   const [mostrarGestioUsuaris, setMostrarGestioUsuaris] = useState(false)
   const [esAdmin, setEsAdmin] = useState(false)
   const [mostrarXat, setMostrarXat] = useState(false)
+  const [mostrarGestioRegistres, setMostrarGestioRegistres] = useState(false)
+  
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -235,8 +239,8 @@ export default function App() {
             <button onClick={() => setMostrarConfig(true)} style={styles.botoCapcalera}>
               ⚙️ Config
             </button>
-            <button onClick={() => setMostrarXat(true)} style={styles.botoCapcalera}>
-              🤖 Assistent
+            <button onClick={() => setMostrarGestioRegistres(true)} style={styles.botoCapcalera}>
+              📋 Registres
             </button>
             <span style={{fontSize:'12px', opacity:0.8}}>{usuari.email}</span>
             <button onClick={tancarSessio} style={styles.botoSortir}>Sortir</button>
@@ -366,6 +370,9 @@ export default function App() {
           onTancar={() => setMostrarGestioCamps(false)}
           onActualitzar={() => carregaPobles()}
         />
+      )}
+      {mostrarGestioRegistres && (
+        <GestioRegistres onTancar={() => setMostrarGestioRegistres(false)} />
       )}
       {mostrarGestioUsuaris && (
         <GestioUsuaris onTancar={() => setMostrarGestioUsuaris(false)} />
