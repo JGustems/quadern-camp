@@ -51,7 +51,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     return inside
   }
 
-  function dibuixaZonaAmbCultius(ctx, pts, cultius, sel, bbox, escala) {
+  function dibuixaZonaAmbCultius(ctx, zona, pts, cultius, sel, bbox, escala) {
     if (!pts.length) return
 
     const canvasPts = pts.map(p => toCanvas(p.x, p.y, bbox, escala))
@@ -208,7 +208,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
       const sel = estaSeleccionada(zona)
       const cultiusZona = cultiusActius[zona.id] || []
 
-      dibuixaZonaAmbCultius(ctx, pts, cultiusZona, sel, bbox, escala)
+      dibuixaZonaAmbCultius(ctx, zona, pts, cultiusZona, sel, bbox, escala)
 
       // Text
       if (!modeMovil) {
