@@ -70,11 +70,10 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     }
 
     if (!cultius || cultius.length === 0) {
-      // Sense cultiu
       ctx.beginPath()
       canvasPts.forEach((p,i) => i===0 ? ctx.moveTo(p.cx,p.cy) : ctx.lineTo(p.cx,p.cy))
       ctx.closePath()
-      ctx.fillStyle = '#e8e4de'
+      ctx.fillStyle = zona.color || '#e8e4de'
       ctx.fill()
       ctx.strokeStyle = 'rgba(0,0,0,0.15)'
       ctx.lineWidth = 0.5
@@ -226,12 +225,18 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
           ctx.textBaseline = 'middle'
           ctx.fillText(zona.codi, cx, cy)
         } else if (cultiusZona.length === 0) {
+          const nomPos = zona.nom_posicio
+          const textX = nomPos ? toCanvas(nomPos.x, nomPos.y, bbox, escala).cx : cx
+          const textY = nomPos ? toCanvas(nomPos.x, nomPos.y, bbox, escala).cy : cy
           ctx.fillStyle = 'rgba(0,0,0,0.3)'
           ctx.font = `${midaText}px system-ui`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
-          ctx.fillText(zona.codi, cx, cy)
+          ctx.fillText(zona.codi, textX, textY)
         } else if (cultiusZona.length === 1) {
+          const nomPos = zona.nom_posicio
+          const textX = nomPos ? toCanvas(nomPos.x, nomPos.y, bbox, escala).cx : cx
+          const textY = nomPos ? toCanvas(nomPos.x, nomPos.y, bbox, escala).cy : cy
           ctx.fillStyle = 'rgba(0,0,0,0.7)'
           ctx.font = `bold ${midaText}px system-ui`
           ctx.textAlign = 'center'
@@ -241,7 +246,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
             text = text.slice(0,-1)
           }
           if (text !== cultiusZona[0].nom) text += '…'
-          ctx.fillText(text, cx, cy)
+          ctx.fillText(text, textX, textY)
         } else if (cultiusZona.length === 2) {
           // Dos cultius — text a cada triangle
           const minX = Math.min(...pts.map(p=>p.x)) * escala + (bbox ? -bbox.minX*escala : 0)
