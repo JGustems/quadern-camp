@@ -48,10 +48,10 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    console.log('useEffect usuari:', usuari?.email)
     if (usuari) {
       carregaPobles()
       comprovaAdmin()
+      actualitzaMeteoRegistres()
     }
   }, [usuari])
 
@@ -63,6 +63,57 @@ export default function App() {
       .single()
     console.log('comprovaAdmin:', data, error, usuari.email)
     setEsAdmin(data?.es_admin || false)
+  }
+  async function actualitzaMeteoRegistres() {
+    const fa7 = new Date()
+    fa7.setDate(fa7.getDate() - 7)
+    const data7 = fa7.toISOString().split('T')[0]
+
+    // Agafar registres de fa 7+ dies sense meteo actualitzada
+    const { data: registresAntics } = await supabase
+      .from('registres')
+      .select('id, data, zona_id, zones(camp_id, camps(pobles(nom)))')
+      .lte('data', data7)
+      .eq('meteo_actualitzada', false)
+      .not('pluja_prevista', 'is', null)
+      .limit(20)
+
+    if (!registresAntics?.length) return
+
+    for (const r of registresAntics) {
+      try {
+        const poblenom = r.zones?.camps?.pobles?.nom
+        const coords = {
+          'All': { lat: 41.4731, lon: 1.5189 },
+          'Begues': { lat: 41.3397, lon: 1.8731 },
+          'Estoll': { lat: 41.5578, lon: 1.4889 },
+          'Alp': { lat: 42.3718, lon: 1.8843 },
+        }[poblenom] || { lat: 41.38, lon: 2.17 }
+
+        const dataR = r.data
+        const dataFi = new Date(dataR)
+        dataFi.setDate(dataFi.getDate() + 7)
+        const dataFiS = dataFi.toISOString().split('T')[0]
+
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&daily=precipitation_sum&timezone=Europe/Madrid&start_date=${dataR}&end_date=${dataFiS}`
+        const res = await fetch(url)
+        const json = await res.json()
+
+        if (json.daily?.precipitation_sum) {
+          const plujaReal = json.daily.precipitation_sum
+            .slice(1) // excloure el dia de la tasca
+            .reduce((s, v) => s + (v||0), 0)
+
+          await supabase.from('registres').update({
+            pluja_real: parseFloat(plujaReal.toFixed(1)),
+            meteo_actualitzada: true,
+          }).eq('id', r.id)
+        }
+      } catch(e) {
+        console.log('Error actualitzant meteo registre', r.id, e)
+      }
+    }
+    console.log(`Meteo actualitzada per ${registresAntics.length} registres`)
   }
 
   async function carregaPobles() {
