@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from './supabase'
 
 const FASES_LLUNA = ['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘']
-const ICONS_TEMPS = {0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',48:'🌫️',51:'🌦️',53:'🌦️',55:'🌧️',61:'🌧️',63:'🌧️',65:'🌧️',71:'🌨️',73:'🌨️',75:'🌨️',80:'🌦️',81:'🌧️',82:'⛈️',95:'⛈️'}
+const FASES_LLUNA_NOM = ['Lluna nova','Creixent','Quart creixent','Gibosa creixent','Lluna plena','Gibosa minvant','Quart minvant','Creixent minvant']
+const ICONS_TEMPS = {0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',51:'🌦️',61:'🌧️',63:'🌧️',65:'🌧️',71:'🌨️',80:'🌦️',95:'⛈️'}
 const DESC_TEMPS = {0:'Cel clar',1:'Poc ennuvolat',2:'Parcialment ennuvolat',3:'Ennuvolat',45:'Boira',51:'Plugim lleuger',61:'Pluja feble',63:'Pluja moderada',65:'Pluja forta',71:'Neu feble',80:'Ruixats',95:'Tempesta'}
 
 function faseLluna(data) {
@@ -15,7 +16,7 @@ function faseLluna(data) {
   return Math.round(jd*8) % 8
 }
 
-export default function FormulariTasca({ zones, camp, onTancar, onGuardat }) {
+export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, onGuardat }) {
   const [tasques, setTasques] = useState([])
   const [subtasques, setSubtasques] = useState([])
   const [cultius, setCultius] = useState([])
@@ -26,6 +27,7 @@ export default function FormulariTasca({ zones, camp, onTancar, onGuardat }) {
   const [subtascaId, setSubtascaId] = useState('')
   const [cultiuId, setCultiuId] = useState('')
   const [varietatId, setVarietatId] = useState('')
+  const [cultiuAssignat, setCultiuAssignat] = useState(null) // cultiu actiu seleccionat
   const [usuariId, setUsuariId] = useState('')
   const [quantitat, setQuantitat] = useState('')
   const [costMaObra, setCostMaObra] = useState('')
@@ -35,11 +37,30 @@ export default function FormulariTasca({ zones, camp, onTancar, onGuardat }) {
   const [data, setData] = useState(new Date().toISOString().split('T')[0])
 
   const [temps, setTemps] = useState(null)
+  const [plujaSentmana, setPlujaSentmana] = useState(null)
+  const [plujaPrevisio, setPlujaPrevisio] = useState(null)
   const [carregantTemps, setCarregantTemps] = useState(false)
   const [guardant, setGuardant] = useState(false)
 
   const tascaSeleccionada = tasques.find(t => t.id === parseInt(tascaId))
   const mostrarCultiu = ['Plantar','Sembrar','Zona permanent'].includes(tascaSeleccionada?.nom)
+
+  // Cultius actius a les zones seleccionades
+  const cultiusActiusZones = () => {
+    const tots = new Map()
+    zones.forEach(zona => {
+      const ca = cultiusActius?.[zona.id]
+      if (Array.isArray(ca)) {
+        ca.forEach(c => {
+          if (!tots.has(c.nom)) tots.set(c.nom, c)
+        })
+      }
+    })
+    return Array.from(tots.values())
+  }
+
+  const cultiusActiusLlista = cultiusActiusZones()
+  const teMulitplesCultius = cultiusActiusLlista.length > 1
 
   useEffect(() => { carregaDades() }, [])
   useEffect(() => { if (tascaId) carregaSubtasques(tascaId) }, [tascaId])
@@ -72,26 +93,52 @@ export default function FormulariTasca({ zones, camp, onTancar, onGuardat }) {
   async function carregaTemps(data) {
     setCarregantTemps(true)
     try {
-      const coordenades = obtenirCoordenades()
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${coordenades.lat}&longitude=${coordenades.lon}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_sum,windspeed_10m_max,relativehumidity_2m_max&timezone=Europe/Madrid&start_date=${data}&end_date=${data}`
+      const coord = obtenirCoordenades()
+      const avui = new Date(data)
+      const fa7 = new Date(avui); fa7.setDate(fa7.getDate()-7)
+      const d7 = fa7.toISOString().split('T')[0]
+      const d14 = new Date(avui); d14.setDate(d14.getDate()+7)
+      const d14s = d14.toISOString().split('T')[0]
+
+      // Temps del dia + pluja setmana passada
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${coord.lat}&longitude=${coord.lon}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_sum,windspeed_10m_max,relativehumidity_2m_max&timezone=Europe/Madrid&start_date=${d7}&end_date=${d14s}`
       const res = await fetch(url)
       const json = await res.json()
+
       if (json.daily) {
-        setTemps({
-          tmax: Math.round(json.daily.temperature_2m_max[0]),
-          tmin: Math.round(json.daily.temperature_2m_min[0]),
-          codi: json.daily.weathercode[0],
-          pluja: json.daily.precipitation_sum[0]?.toFixed(1),
-          vent: Math.round(json.daily.windspeed_10m_max[0]),
-          humitat: json.daily.relativehumidity_2m_max[0],
-          lluna: faseLluna(data),
-        })
+        const dies = json.daily.time
+        const idxAvui = dies.indexOf(data)
+        const idxFa7 = 0
+
+        if (idxAvui >= 0) {
+          setTemps({
+            tmax: Math.round(json.daily.temperature_2m_max[idxAvui]),
+            tmin: Math.round(json.daily.temperature_2m_min[idxAvui]),
+            codi: json.daily.weathercode[idxAvui],
+            pluja: json.daily.precipitation_sum[idxAvui]?.toFixed(1),
+            vent: Math.round(json.daily.windspeed_10m_max[idxAvui]),
+            humitat: json.daily.relativehumidity_2m_max[idxAvui],
+            lluna: faseLluna(data),
+          })
+        }
+
+        // Pluja setmana passada
+        const plujaPassada = json.daily.precipitation_sum
+          .slice(idxFa7, idxAvui >= 0 ? idxAvui : 7)
+          .reduce((s, v) => s + (v||0), 0)
+        setPlujaSentmana(plujaPassada.toFixed(1))
+
+        // Pluja previsió propera setmana
+        const plujaFutura = json.daily.precipitation_sum
+          .slice(idxAvui >= 0 ? idxAvui+1 : 7)
+          .reduce((s, v) => s + (v||0), 0)
+        setPlujaPrevisio(plujaFutura.toFixed(1))
       }
     } catch(e) { setTemps(null) }
     setCarregantTemps(false)
   }
 
-function obtenirCoordenades() {
+  function obtenirCoordenades() {
     const coords = {
       'All': { lat: 41.4731, lon: 1.5189 },
       'Begues': { lat: 41.3397, lon: 1.8731 },
@@ -104,6 +151,9 @@ function obtenirCoordenades() {
   async function guardar() {
     if (!tascaId || zones.length === 0) return
     setGuardant(true)
+
+    const lluna = faseLluna(data)
+
     const registres = zones.map(zona => ({
       zona_id: zona.id,
       cultiu_id: cultiuId ? parseInt(cultiuId) : null,
@@ -118,7 +168,14 @@ function obtenirCoordenades() {
       cost_producte: costProducte ? parseFloat(costProducte) : null,
       nom_producte: nomProducte || null,
       notes: notes || null,
+      lluna,
+      pluja_setmana: plujaSentmana ? parseFloat(plujaSentmana) : null,
+      temp_max: temps?.tmax || null,
+      temp_min: temps?.tmin || null,
+      codi_temps: temps?.codi || null,
+      pluja_prevista: plujaPrevisio ? parseFloat(plujaPrevisio) : null,
     }))
+
     await supabase.from('registres').insert(registres)
     setGuardant(false)
     onGuardat()
@@ -143,6 +200,7 @@ function obtenirCoordenades() {
             <input type="date" style={styles.input} value={data} onChange={e => setData(e.target.value)} />
           </div>
 
+          {/* Temps */}
           {temps && (
             <div style={styles.tempsBox}>
               <div style={styles.tempsIco}>{ICONS_TEMPS[temps.codi] || '🌡️'}</div>
@@ -151,14 +209,39 @@ function obtenirCoordenades() {
                 <div style={styles.tempsDesc}>{DESC_TEMPS[temps.codi] || 'Variable'}</div>
               </div>
               <div style={styles.tempsExtra}>
-                <span>{FASES_LLUNA[temps.lluna]}</span>
-                <span>💧{temps.pluja}mm</span>
-                <span>💨{temps.vent}km/h</span>
-                <span>☁️{temps.humitat}%</span>
+                <span title={FASES_LLUNA_NOM[temps.lluna]}>
+                  {FASES_LLUNA[temps.lluna]} {FASES_LLUNA_NOM[temps.lluna]}
+                </span>
+                <span>💧 Avui: {temps.pluja}mm</span>
+                <span>🌧️ Última setmana: {plujaSentmana}mm</span>
+                <span>🔮 Propera setmana: {plujaPrevisio}mm</span>
+                <span>💨 {temps.vent}km/h</span>
               </div>
             </div>
           )}
           {carregantTemps && <div style={styles.carregant}>Carregant dades meteorològiques...</div>}
+
+          {/* Cultiu actiu — si n'hi ha múltiples, preguntar */}
+          {teMulitplesCultius && !mostrarCultiu && (
+            <div style={styles.grup}>
+              <label style={styles.etiqueta}>Assignar tasca a quin cultiu?</label>
+              <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
+                <div
+                  style={{...styles.cultiuOpcio, ...(cultiuAssignat===null?styles.cultiuOpcioActiu:{})}}
+                  onClick={() => setCultiuAssignat(null)}>
+                  Tots els cultius de la zona
+                </div>
+                {cultiusActiusLlista.map(c => (
+                  <div key={c.nom}
+                    style={{...styles.cultiuOpcio, ...(cultiuAssignat?.nom===c.nom?styles.cultiuOpcioActiu:{})}}
+                    onClick={() => setCultiuAssignat(c)}>
+                    <div style={{width:'12px',height:'12px',borderRadius:'3px',background:c.color||'#ddd',flexShrink:0}}/>
+                    {c.nom}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div style={styles.grup}>
             <label style={styles.etiqueta}>Tasca *</label>
@@ -270,13 +353,15 @@ const styles = {
   etiqueta: { display:'block', fontSize:'12px', color:'#888', marginBottom:'5px', fontWeight:'500' },
   input: { width:'100%', padding:'9px 12px', border:'1px solid #ddd', borderRadius:'8px', fontSize:'14px', color:'#333', background:'white', boxSizing:'border-box' },
   fila2: { display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px' },
-  tempsBox: { background:'#f0f9f5', border:'1px solid #b5e0d0', borderRadius:'10px', padding:'12px', marginBottom:'14px', display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap' },
-  tempsIco: { fontSize:'32px' },
-  tempsDades: { flex:1 },
+  tempsBox: { background:'#f0f9f5', border:'1px solid #b5e0d0', borderRadius:'10px', padding:'12px', marginBottom:'14px', display:'flex', flexDirection:'column', gap:'8px' },
+  tempsIco: { fontSize:'28px' },
+  tempsDades: {},
   tempsTemp: { fontSize:'18px', fontWeight:'600', color:'#1D9E75' },
   tempsDesc: { fontSize:'12px', color:'#666', marginTop:'2px' },
-  tempsExtra: { display:'flex', gap:'10px', fontSize:'13px', color:'#555', flexWrap:'wrap' },
+  tempsExtra: { display:'flex', flexDirection:'column', gap:'4px', fontSize:'12px', color:'#555' },
   carregant: { fontSize:'12px', color:'#aaa', textAlign:'center', padding:'8px', marginBottom:'10px' },
+  cultiuOpcio: { display:'flex', alignItems:'center', gap:'8px', padding:'8px 12px', borderRadius:'8px', border:'1px solid #ddd', cursor:'pointer', fontSize:'13px', color:'#333' },
+  cultiuOpcioActiu: { background:'#E1F5EE', borderColor:'#1D9E75', color:'#0F6E56', fontWeight:'500' },
   botoPrincipal: { padding:'10px 24px', background:'#1D9E75', color:'white', border:'none', borderRadius:'8px', fontSize:'14px', cursor:'pointer', fontWeight:'500' },
   botoSecundari: { padding:'10px 24px', background:'white', color:'#666', border:'1px solid #ddd', borderRadius:'8px', fontSize:'14px', cursor:'pointer' },
 }
