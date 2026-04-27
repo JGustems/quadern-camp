@@ -380,6 +380,7 @@ export default function App() {
         <FormulariTasca
           zones={zonesSeleccionades}
           camp={campAmbPoble()}
+          cultiusActius={cultiusActius}
           onTancar={() => setMostrarFormulari(false)}
           onGuardat={() => {
             setMostrarFormulari(false)
