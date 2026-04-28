@@ -219,11 +219,14 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
         const midaText = Math.min(Math.max(8, Math.min(amplada, alcada) * 0.25), 13)
 
         if (sel) {
+          const nomPos = zona.nom_posicio
+          const textX = nomPos ? toCanvas(nomPos.x, nomPos.y, bbox, escala).cx : cx
+          const textY = nomPos ? toCanvas(nomPos.x, nomPos.y, bbox, escala).cy : cy
           ctx.fillStyle = '#042C53'
           ctx.font = `bold ${midaText}px system-ui`
           ctx.textAlign = 'center'
           ctx.textBaseline = 'middle'
-          ctx.fillText(zona.codi, cx, cy)
+          ctx.fillText(zona.codi, textX, textY)
         } else if (cultiusZona.length === 0) {
           const nomPos = zona.nom_posicio
           const textX = nomPos ? toCanvas(nomPos.x, nomPos.y, bbox, escala).cx : cx
