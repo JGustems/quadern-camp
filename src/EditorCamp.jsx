@@ -28,6 +28,7 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
   const [nomPosicions, setNomPosicions] = useState({})
   const [missatges, setMissatges] = useState([])
   const [zonesAEliminar, setZonesAEliminar] = useState([])
+  const [snapPtActiu, setSnapPtActiu] = useState(null)
 
   const COLORS = ['#FAC775','#C0DD97','#9FE1CB','#F5C4B3','#F4C0D1','#B5D4F4','#D3D1C7','#F7C1C1','#EAF3DE','#D4B5F4']
 
@@ -40,7 +41,7 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
   }
 
   useEffect(() => { carregaDades() }, [camp])
-  useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades, mode, canvasSize, nomPosicions, zonesAEliminar])
+  useEffect(() => { dibuixa() }, [zones, perimetre, ptsDibuix, zonesSeleccionades, mode, canvasSize, nomPosicions, zonesAEliminar, snapPtActiu])
 
   async function carregaDades() {
     if (!camp) return
@@ -209,6 +210,18 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
         ctx.strokeStyle = 'white'; ctx.lineWidth = 1.5; ctx.stroke()
       })
     }
+    // Mostrar punt de snap actiu
+    if (snapPtActiu) {
+      ctx.beginPath()
+      ctx.arc(snapPtActiu.x*ESCALA, snapPtActiu.y*ESCALA, 8, 0, Math.PI*2)
+      ctx.strokeStyle = '#1D9E75'
+      ctx.lineWidth = 2
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.arc(snapPtActiu.x*ESCALA, snapPtActiu.y*ESCALA, 3, 0, Math.PI*2)
+      ctx.fillStyle = '#1D9E75'
+      ctx.fill()
+    }
   }
 
   function getCanvasPos(e) {
@@ -221,12 +234,56 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
       y: ((e.clientY - rect.top) * scaleY) / ESCALA
     }
   }
+function trobarPuntProper(x, y) {
+    const RADI_SNAP = 20 / ESCALA // 20 pixels en coordenades reals
+    let millorPt = null
+    let millorDist = Infinity
 
+    // Buscar en punts del perímetre
+    perimetre.forEach(p => {
+      const dist = Math.hypot(x-p.x, y-p.y)
+      if (dist < RADI_SNAP && dist < millorDist) {
+        millorDist = dist
+        millorPt = p
+      }
+    })
+
+    // Buscar en punts de les zones
+    zones.filter(z => !estaEliminada(z)).forEach(zona => {
+      const pts = getPts(zona)
+      pts.forEach(p => {
+        const dist = Math.hypot(x-p.x, y-p.y)
+        if (dist < RADI_SNAP && dist < millorDist) {
+          millorDist = dist
+          millorPt = p
+        }
+      })
+    })
+
+    // Buscar en punts que ja hem dibuixat
+    ptsDibuix.forEach(p => {
+      const dist = Math.hypot(x-p.x, y-p.y)
+      if (dist < RADI_SNAP && dist < millorDist) {
+        millorDist = dist
+        millorPt = p
+      }
+    })
+
+    return millorPt
+  }
   function handleClick(e) {
     const {x, y} = getCanvasPos(e)
 
-    if (mode === 'perimetre') { setPtsDibuix(prev => [...prev, {x,y}]); return }
-    if (mode === 'zona') { setPtsDibuix(prev => [...prev, {x,y}]); return }
+    if (mode === 'perimetre') {
+      const snapPt = trobarPuntProper(x, y)
+      setPtsDibuix(prev => [...prev, snapPt || {x,y}])
+      return
+    }
+    if (mode === 'zona') {
+      const snapPt = trobarPuntProper(x, y)
+      setPtsDibuix(prev => [...prev, snapPt || {x,y}])
+      return
+    }
 
     if (mode === 'moure') {
       if (e.button === 2) {
@@ -350,6 +407,13 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
     if (dragPt === null) return
     if (dragTarget === 'nom') {
       setNomPosicions(prev => ({...prev, [dragPt]: {x,y}}))
+      // Snap visual
+    if (mode === 'perimetre' || mode === 'zona') {
+      const snap = trobarPuntProper(x, y)
+      setSnapPtActiu(snap)
+    } else {
+      setSnapPtActiu(null)
+    }
       return
     }
     if (dragTarget === 'perimetre') {
@@ -364,6 +428,7 @@ export default function EditorCamp({ camp, onTancar, onGuardat }) {
           return zonaActualitzada
         }
         return z
+        
       }))
     }
   }
