@@ -2,6 +2,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
   const { createClient } = await import('@supabase/supabase-js')
+  console.log('URL:', process.env.SUPABASE_URL ? 'OK' : 'MISSING')
+  console.log('KEY:', process.env.SUPABASE_ANON_KEY ? 'OK' : 'MISSING')
   const supabase = createClient(
     process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL,
     process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
