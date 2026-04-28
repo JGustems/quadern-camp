@@ -24,6 +24,8 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
+  console.log('URL val:', SUPABASE_URL?.substring(0,20))
+  console.log('KEY val:', SUPABASE_KEY?.substring(0,10))
   const { offset = 0 } = req.body || {}
 
   const { data: registres, error } = await supabase
