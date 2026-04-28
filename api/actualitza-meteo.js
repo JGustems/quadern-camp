@@ -29,7 +29,7 @@ export default async function handler(req, res) {
   const { offset = 0 } = req.body || {}
 
   // Agafar 10 registres sense meteo
-  const { data: registres } = await supabase
+const { data: registres, error } = await supabase
     .from('registres')
     .select('id, data, zona_id, zones(camp_id, camps(pobles(nom)))')
     .is('temp_max', null)
@@ -37,6 +37,7 @@ export default async function handler(req, res) {
     .order('data', { ascending: true })
     .range(offset, offset + 9)
 
+  console.log('Registres trobats:', registres?.length, 'Error:', error?.message)
   if (!registres?.length) {
     return res.status(200).json({ fet: true, processats: 0 })
   }
