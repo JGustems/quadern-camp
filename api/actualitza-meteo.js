@@ -1,35 +1,32 @@
+import { createClient } from '@supabase/supabase-js'
+
+const SUPABASE_URL = process.env.SUPABASE_URL
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY
+
+function faseLluna(data) {
+  const d = new Date(data)
+  const any = d.getFullYear(), mes = d.getMonth()+1, dia = d.getDate()
+  let c, e, jd, b
+  if (mes < 3) { const y=any-1; const m=mes+12; c=Math.floor(365.25*y); e=Math.floor(30.6*(m+1)); jd=c+e+dia-694039.09 }
+  else { c=Math.floor(365.25*any); e=Math.floor(30.6*(mes+1)); jd=c+e+dia-694039.09 }
+  jd /= 29.53; b=Math.floor(jd); jd -= b
+  return Math.round(jd*8) % 8
+}
+
+const COORDS = {
+  'All': { lat: 41.4731, lon: 1.5189 },
+  'Begues': { lat: 41.3397, lon: 1.8731 },
+  'Estoll': { lat: 41.5578, lon: 1.4889 },
+  'Alp': { lat: 42.3718, lon: 1.8843 },
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end()
 
-  const { createClient } = await import('@supabase/supabase-js')
-  console.log('URL:', process.env.SUPABASE_URL ? 'OK' : 'MISSING')
-  console.log('KEY:', process.env.SUPABASE_ANON_KEY ? 'OK' : 'MISSING')
-  const supabase = createClient(
-    process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL,
-    process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
-  )
-
-  const FASES_LLUNA = (data) => {
-    const d = new Date(data)
-    const any = d.getFullYear(), mes = d.getMonth()+1, dia = d.getDate()
-    let c, e, jd, b
-    if (mes < 3) { const y=any-1; const m=mes+12; c=Math.floor(365.25*y); e=Math.floor(30.6*(m+1)); jd=c+e+dia-694039.09 }
-    else { c=Math.floor(365.25*any); e=Math.floor(30.6*(mes+1)); jd=c+e+dia-694039.09 }
-    jd /= 29.53; b=Math.floor(jd); jd -= b
-    return Math.round(jd*8) % 8
-  }
-
-  const coords = {
-    'All': { lat: 41.4731, lon: 1.5189 },
-    'Begues': { lat: 41.3397, lon: 1.8731 },
-    'Estoll': { lat: 41.5578, lon: 1.4889 },
-    'Alp': { lat: 42.3718, lon: 1.8843 },
-  }
-
+  const supabase = createClient(SUPABASE_URL, SUPABASE_KEY)
   const { offset = 0 } = req.body || {}
 
-  // Agafar 10 registres sense meteo
-const { data: registres, error } = await supabase
+  const { data: registres, error } = await supabase
     .from('registres')
     .select('id, data, zona_id, zones(camp_id, camps(pobles(nom)))')
     .is('temp_max', null)
@@ -37,7 +34,8 @@ const { data: registres, error } = await supabase
     .order('data', { ascending: true })
     .range(offset, offset + 9)
 
-  console.log('Registres trobats:', registres?.length, 'Error:', error?.message)
+  console.log('Registres:', registres?.length, 'Error:', error?.message)
+
   if (!registres?.length) {
     return res.status(200).json({ fet: true, processats: 0 })
   }
@@ -46,10 +44,9 @@ const { data: registres, error } = await supabase
   for (const r of registres) {
     try {
       const poblenom = r.zones?.camps?.pobles?.nom
-      const coord = coords[poblenom] || { lat: 41.38, lon: 2.17 }
+      const coord = COORDS[poblenom] || { lat: 41.38, lon: 2.17 }
       const dataR = r.data
 
-      // Data inici (7 dies abans) i fi (7 dies després)
       const dataInici = new Date(dataR)
       dataInici.setDate(dataInici.getDate() - 7)
       const dataFi = new Date(dataR)
@@ -81,7 +78,7 @@ const { data: registres, error } = await supabase
         temp_max: Math.round(json.daily.temperature_2m_max[idxAvui]),
         temp_min: Math.round(json.daily.temperature_2m_min[idxAvui]),
         codi_temps: json.daily.weathercode[idxAvui],
-        lluna: FASES_LLUNA(dataR),
+        lluna: faseLluna(dataR),
         pluja_setmana: parseFloat(plujaPassada.toFixed(1)),
         pluja_prevista: parseFloat(plujaFutura.toFixed(1)),
         pluja_real: jaPassat ? parseFloat(plujaFutura.toFixed(1)) : null,
@@ -94,9 +91,5 @@ const { data: registres, error } = await supabase
     }
   }
 
-  return res.status(200).json({ 
-    processats, 
-    total: registres.length,
-    seguent: offset + registres.length 
-  })
+  return res.status(200).json({ processats, total: registres.length, seguent: offset + registres.length })
 }
