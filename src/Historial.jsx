@@ -162,6 +162,7 @@ function cultiusActius() {
   )
 }
 
+
 function VistaCronologica({ registres, formatData }) {
   const [expandit, setExpandit] = useState(null)
 
@@ -174,7 +175,7 @@ function VistaCronologica({ registres, formatData }) {
     <div>
       {registres.map(r => {
         const esExpandit = expandit === r.id
-        const teMeteo = r.temp_max || r.lluna !== null || r.pluja_setmana !== null
+        const teMeteo = true // Sempre mostrar opció d'expandir
 
         return (
           <div key={r.id} style={{...styles.registre, cursor:'pointer'}}
