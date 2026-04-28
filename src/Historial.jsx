@@ -163,40 +163,99 @@ function cultiusActius() {
 }
 
 function VistaCronologica({ registres, formatData }) {
+  const [expandit, setExpandit] = useState(null)
+
+  const FASES_LLUNA = ['🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘']
+  const FASES_NOM = ['Lluna nova','Creixent','Quart creixent','Gibosa creixent','Lluna plena','Gibosa minvant','Quart minvant','Creixent minvant']
+  const ICONS_TEMPS = {0:'☀️',1:'🌤️',2:'⛅',3:'☁️',45:'🌫️',51:'🌦️',61:'🌧️',63:'🌧️',65:'🌧️',71:'🌨️',80:'🌦️',95:'⛈️'}
+  const DESC_TEMPS = {0:'Cel clar',1:'Poc ennuvolat',2:'Parcialment ennuvolat',3:'Ennuvolat',45:'Boira',51:'Plugim lleuger',61:'Pluja feble',63:'Pluja moderada',65:'Pluja forta',71:'Neu feble',80:'Ruixats',95:'Tempesta'}
+
   return (
     <div>
-      {registres.map(r => (
-        <div key={r.id} style={styles.registre}>
-          <div style={styles.registreIco}>
-            {ICONS_TASCA[r.tasques?.nom] || '📝'}
-          </div>
-          <div style={styles.registreCos}>
-            <div style={styles.registreTitol}>
-              {r.tasques?.nom}
-              {r.subtasques?.nom && <span style={styles.subtasca}> · {r.subtasques.nom}</span>}
+      {registres.map(r => {
+        const esExpandit = expandit === r.id
+        const teMeteo = r.temp_max || r.lluna !== null || r.pluja_setmana !== null
+
+        return (
+          <div key={r.id} style={{...styles.registre, cursor:'pointer'}}
+            onClick={() => setExpandit(esExpandit ? null : r.id)}>
+            <div style={styles.registreIco}>
+              {ICONS_TASCA[r.tasques?.nom] || '📝'}
             </div>
-            {r.cultius?.nom && (
-              <div style={styles.registreCultiu}>
-                🌱 {r.cultius.nom}
-                {r.varietats?.nom && r.varietats.nom !== '-' && ` · ${r.varietats.nom}`}
+            <div style={styles.registreCos}>
+              <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                <div style={styles.registreTitol}>
+                  {r.tasques?.nom}
+                  {r.subtasques?.nom && <span style={styles.subtasca}> · {r.subtasques.nom}</span>}
+                </div>
+                {teMeteo && (
+                  <span style={{fontSize:'11px', color:'#1D9E75', marginLeft:'auto'}}>
+                    {esExpandit ? '▲' : '▼'} meteo
+                  </span>
+                )}
               </div>
-            )}
-            <div style={styles.registreMeta}>
-              <span>📅 {formatData(r.data)}</span>
-              {r.zones?.codi && <span>📍 Zona {r.zones.codi}</span>}
-              {r.quantitat && <span>⚖️ {r.quantitat} {r.unitat || ''}</span>}
-              {r.usuaris?.nom && <span>👤 {r.usuaris.nom}</span>}
+              {r.cultius?.nom && (
+                <div style={styles.registreCultiu}>
+                  🌱 {r.cultius.nom}
+                  {r.varietats?.nom && r.varietats.nom !== '-' && ` · ${r.varietats.nom}`}
+                </div>
+              )}
+              <div style={styles.registreMeta}>
+                <span>📅 {formatData(r.data)}</span>
+                {r.zones?.codi && <span>📍 Zona {r.zones.codi}</span>}
+                {r.quantitat && <span>⚖️ {r.quantitat} {r.unitat || ''}</span>}
+                {r.usuaris?.nom && <span>👤 {r.usuaris.nom}</span>}
+              </div>
+              {(r.cost_ma_obra || r.cost_producte) && (
+                <div style={styles.registreCost}>
+                  💶 {((r.cost_ma_obra||0)+(r.cost_producte||0)).toFixed(2)}€
+                  {r.nom_producte && ` · ${r.nom_producte}`}
+                </div>
+              )}
+              {r.notes && <div style={styles.registreNotes}>💬 {r.notes}</div>}
+
+              {esExpandit && teMeteo && (
+                <div style={styles.meteoBox}>
+                  {r.temp_max !== null && (
+                    <div style={styles.meteoFila}>
+                      <span>{ICONS_TEMPS[r.codi_temps] || '🌡️'}</span>
+                      <span>{DESC_TEMPS[r.codi_temps] || '—'}</span>
+                      <span>{r.temp_max}° / {r.temp_min}°</span>
+                    </div>
+                  )}
+                  {r.lluna !== null && (
+                    <div style={styles.meteoFila}>
+                      <span>{FASES_LLUNA[r.lluna]}</span>
+                      <span>{FASES_NOM[r.lluna]}</span>
+                    </div>
+                  )}
+                  {r.pluja_setmana !== null && (
+                    <div style={styles.meteoFila}>
+                      <span>🌧️</span>
+                      <span>Pluja setmana anterior</span>
+                      <span>{r.pluja_setmana} mm</span>
+                    </div>
+                  )}
+                  {r.pluja_prevista !== null && (
+                    <div style={styles.meteoFila}>
+                      <span>🔮</span>
+                      <span>Previsió setmana següent</span>
+                      <span>{r.pluja_prevista} mm</span>
+                    </div>
+                  )}
+                  {r.pluja_real !== null && (
+                    <div style={{...styles.meteoFila, color:'#1D9E75'}}>
+                      <span>✅</span>
+                      <span>Pluja real setmana següent</span>
+                      <span>{r.pluja_real} mm</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            {(r.cost_ma_obra || r.cost_producte) && (
-              <div style={styles.registreCost}>
-                💶 {((r.cost_ma_obra||0)+(r.cost_producte||0)).toFixed(2)}€
-                {r.nom_producte && ` · ${r.nom_producte}`}
-              </div>
-            )}
-            {r.notes && <div style={styles.registreNotes}>💬 {r.notes}</div>}
           </div>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
@@ -277,4 +336,6 @@ const styles = {
   registrePetitTasca: { color:'#333', fontWeight:'500' },
   registrePetitQ: { color:'#1D9E75', marginLeft:'auto' },
   botoSecundari: { padding:'10px 24px', background:'white', color:'#666', border:'1px solid #ddd', borderRadius:'8px', fontSize:'14px', cursor:'pointer' },
+  meteoBox: { background:'#f0f9f5', border:'1px solid #b5e0d0', borderRadius:'8px', padding:'10px', marginTop:'8px', display:'flex', flexDirection:'column', gap:'6px' },
+  meteoFila: { display:'flex', alignItems:'center', gap:'8px', fontSize:'12px', color:'#555' }
 }
