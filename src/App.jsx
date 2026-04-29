@@ -11,7 +11,7 @@ import GestioCamps from './GestioCamps.jsx'
 import GestioUsuaris from './GestioUsuaris.jsx'
 import XatIA from './XatIA.jsx'
 import GestioRegistres from './GestioRegistres.jsx'
-
+import Planters from './Planters.jsx'
 
 export default function App() {
   const [usuari, setUsuari] = useState(null)
@@ -33,6 +33,7 @@ export default function App() {
   const [esAdmin, setEsAdmin] = useState(false)
   const [mostrarXat, setMostrarXat] = useState(false)
   const [mostrarGestioRegistres, setMostrarGestioRegistres] = useState(false)
+  const [mostrarPlanters, setMostrarPlanters] = useState(false)
   
 
   useEffect(() => {
@@ -290,6 +291,9 @@ export default function App() {
             <button onClick={() => setMostrarConfig(true)} style={styles.botoCapcalera}>
               ⚙️ Config
             </button>
+            <button onClick={() => setMostrarPlanters(true)} style={styles.botoCapcalera}>
+              🌱 Planters
+            </button>
             <button onClick={() => setMostrarGestioRegistres(true)} style={styles.botoCapcalera}>
               📋 Registres
             </button>
@@ -442,6 +446,9 @@ export default function App() {
       )}
       {mostrarGestioRegistres && (
         <GestioRegistres onTancar={() => setMostrarGestioRegistres(false)} />
+      )}
+      {mostrarPlanters && (
+        <Planters onTancar={() => setMostrarPlanters(false)} />
       )}
     </div>
   )
