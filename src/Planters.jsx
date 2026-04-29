@@ -11,12 +11,14 @@ export default function Planters({ onTancar }) {
   const [cellaSeleccionada, setCellaSeleccionada] = useState(null)
   const [mostrarNouPlanter, setMostrarNouPlanter] = useState(false)
   const [guardant, setGuardant] = useState(false)
+  
 
   // Nou planter
   const [nouNom, setNouNom] = useState('')
   const [nouFiles, setNouFiles] = useState(4)
   const [nouColumnes, setNouColumnes] = useState(6)
   const [nouUbicacio, setNouUbicacio] = useState('Casa')
+  
 
   // Edició cel·la
   const [cellaEstat, setCellaEstat] = useState('buida')
@@ -24,6 +26,7 @@ export default function Planters({ onTancar }) {
   const [cellaVarietatId, setCellaVarietatId] = useState('')
   const [cellaData, setCellaData] = useState(new Date().toISOString().split('T')[0])
   const [cellaNotes, setCellaNotes] = useState('')
+  const [cellesSeleccionades, setCellesSeleccionades] = useState([])
 
   useEffect(() => { carregaDades() }, [])
   useEffect(() => { if (planterActiu) carregaCelles(planterActiu.id) }, [planterActiu])
@@ -89,21 +92,31 @@ export default function Planters({ onTancar }) {
   }
 
   async function guardarCella() {
-    if (!cellaSeleccionada) return
+    const aGuardar = cellesSeleccionades.length > 0 ? cellesSeleccionades : [cellaSeleccionada]
+    if (!aGuardar.length) return
     setGuardant(true)
-    await supabase.from('planter_cel·les').update({
-      estat: cellaEstat,
-      cultiu_id: cellaEstat === 'sembrada' ? (cellaCultiuId ? parseInt(cellaCultiuId) : null) : null,
-      varietat_id: cellaEstat === 'sembrada' ? (cellaVarietatId ? parseInt(cellaVarietatId) : null) : null,
-      data_sembra: cellaEstat === 'sembrada' ? cellaData : null,
-      notes: cellaNotes || null,
-    }).eq('id', cellaSeleccionada.id)
+    for (const cella of aGuardar) {
+      await supabase.from('planter_cel·les').update({
+        estat: cellaEstat,
+        cultiu_id: cellaEstat === 'sembrada' ? (cellaCultiuId ? parseInt(cellaCultiuId) : null) : null,
+        varietat_id: cellaEstat === 'sembrada' ? (cellaVarietatId ? parseInt(cellaVarietatId) : null) : null,
+        data_sembra: cellaEstat === 'sembrada' ? cellaData : null,
+        notes: cellaNotes || null,
+      }).eq('id', cella.id)
+    }
     await carregaCelles(planterActiu.id)
     setCellaSeleccionada(null)
+    setCellesSeleccionades([])
     setGuardant(false)
   }
 
-  function seleccionarCella(cella) {
+  function toggleCella(cella) {
+    setCellesSeleccionades(prev => {
+      const jaHi = prev.find(c => c.id === cella.id)
+      if (jaHi) return prev.filter(c => c.id !== cella.id)
+      return [...prev, cella]
+    })
+    // Si és la primera seleccionada, carregar els seus valors al panell
     setCellaSeleccionada(cella)
     setCellaEstat(cella.estat)
     setCellaCultiuId(cella.cultiu_id?.toString() || '')
@@ -202,47 +215,53 @@ export default function Planters({ onTancar }) {
                 <div style={styles.graellaWrap}>
                   <div style={{
                     display: 'grid',
-                    gridTemplateColumns: `repeat(${planterActiu.columnes}, 1fr)`,
-                    gap: '3px',
+                    gridTemplateColumns: `repeat(${planterActiu.columnes}, minmax(28px, 40px))`,
+                    gap: '2px',
                     padding: '12px',
                   }}>
                     {Array.from({length: planterActiu.files}, (_,fi) =>
-                      Array.from({length: planterActiu.columnes}, (_,ci) => {
-                        const cella = cellesActives.find(c => c.fila===fi+1 && c.columna===ci+1)
-                        const seleccionada = cellaSeleccionada?.id === cella?.id
-                        return (
-                          <div key={`${fi}-${ci}`}
-                            onClick={() => cella && seleccionarCella(cella)}
-                            style={{
-                              aspectRatio: '1',
-                              background: cella ? colorCella(cella) : '#f0f0f0',
-                              border: seleccionada ? '2px solid #1D9E75' : '1px solid #ddd',
-                              borderRadius: '4px',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              flexDirection: 'column',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              fontSize: '10px',
-                              fontWeight: '500',
-                              color: cella?.estat === 'x' ? '#999' : '#333',
-                              padding: '2px',
-                              textAlign: 'center',
-                              overflow: 'hidden',
-                              lineHeight: '1.2',
-                            }}>
-                            {cella ? textCella(cella).split('\n').map((t,i) => (
-                              <span key={i} style={{fontSize: i===0?'10px':'9px', color: i===0?'#333':'#666'}}>
-                                {t.substring(0,8)}{t.length>8?'…':''}
+                    Array.from({length: planterActiu.columnes}, (_,ci) => {
+                      const cella = cellesActives.find(c => c.fila===fi+1 && c.columna===ci+1)
+                      const seleccionada = cellesSeleccionades.some(c => c.id === cella?.id)
+                      const estaX = cella?.estat === 'x'
+                      const estaSembrada = cella?.estat === 'sembrada'
+                      return (
+                        <div key={`${fi}-${ci}`}
+                          onClick={() => cella && toggleCella(cella)}
+                          style={{
+                            aspectRatio: '1',
+                            background: estaX ? '#ccc' : estaSembrada ? (cella.cultius?.color || '#C0DD97') : 'white',
+                            border: seleccionada ? '2px solid #1D9E75' : '1px solid #ddd',
+                            borderRadius: '3px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            overflow: 'hidden',
+                            position: 'relative',
+                          }}>
+                          {estaX ? (
+                            <span style={{fontSize:'16px', fontWeight:'bold', color:'#888', lineHeight:1}}>✕</span>
+                          ) : estaSembrada ? (
+                            <>
+                              <span style={{fontSize:'8px', fontWeight:'600', color:'#333', textAlign:'center', lineHeight:1.2, padding:'1px'}}>
+                                {cella.cultius?.nom?.substring(0,8)}
                               </span>
-                            )) : ''}
-                            <span style={{fontSize:'9px', color:'#bbb'}}>
-                              {fi+1},{ci+1}
-                            </span>
-                          </div>
-                        )
-                      })
-                    )}
+                              {cella.varietats?.nom && cella.varietats.nom !== '-' && (
+                                <span style={{fontSize:'7px', color:'#555', textAlign:'center', lineHeight:1.1}}>
+                                  {cella.varietats.nom.substring(0,8)}
+                                </span>
+                              )}
+                            </>
+                          ) : null}
+                          {seleccionada && (
+                            <div style={{position:'absolute', top:'1px', right:'2px', fontSize:'8px', color:'#1D9E75'}}>✓</div>
+                          )}
+                        </div>
+                      )
+                    })
+                  )}
                   </div>
                 </div>
 
@@ -264,11 +283,18 @@ export default function Planters({ onTancar }) {
           </div>
 
           {/* Panell edició cel·la */}
-          {cellaSeleccionada && (
+          {(cellaSeleccionada || cellesSeleccionades.length > 0) && (
             <div style={styles.panell}>
               <div style={styles.panellTitol}>
-                Cel·la {cellaSeleccionada.fila},{cellaSeleccionada.columna}
+                {cellesSeleccionades.length > 1
+                  ? `${cellesSeleccionades.length} cel·les seleccionades`
+                  : `Cel·la ${cellaSeleccionada.fila},${cellaSeleccionada.columna}`}
               </div>
+              {cellesSeleccionades.length > 1 && (
+                <div style={{fontSize:'11px', color:'#888', marginBottom:'10px'}}>
+                  Els canvis s'aplicaran a totes les cel·les seleccionades
+                </div>
+              )}
 
               <div style={styles.grup}>
                 <label style={styles.label}>Estat</label>
@@ -326,6 +352,9 @@ export default function Planters({ onTancar }) {
                   {guardant ? '...' : 'Guardar'}
                 </button>
                 <button style={styles.botoCancel} onClick={() => setCellaSeleccionada(null)}>
+                  Cancel·lar
+                </button>
+                <button style={styles.botoCancel} onClick={() => { setCellaSeleccionada(null); setCellesSeleccionades([]) }}>
                   Cancel·lar
                 </button>
               </div>
