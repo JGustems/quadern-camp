@@ -173,7 +173,8 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
       ctx.stroke()
     }
 
-    zones.forEach(zona => {
+    const zonesOrdenades = [...zones].sort((a,b) => (a.ordre||0) - (b.ordre||0))
+    zonesOrdenades.forEach(zona => {
       const pts = getPts(zona)
       if (!pts.length) return
       const sel = estaSeleccionada(zona)
@@ -198,22 +199,26 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
           ctx.textBaseline = 'middle'
           ctx.fillText(zona.codi, textX, textY)
         } else if (cultiusZona.length === 0) {
-          ctx.fillStyle = 'rgba(0,0,0,0.3)'
-          ctx.font = `${midaText}px system-ui`
-          ctx.textAlign = 'center'
-          ctx.textBaseline = 'middle'
-          ctx.fillText(zona.codi, textX, textY)
-        } else if (cultiusZona.length === 1) {
-          ctx.fillStyle = 'rgba(0,0,0,0.7)'
-          ctx.font = `bold ${midaText}px system-ui`
-          ctx.textAlign = 'center'
-          ctx.textBaseline = 'middle'
-          let text = cultiusZona[0].nom
-          while (ctx.measureText(text).width > amplada * 0.85 && text.length > 3) {
-            text = text.slice(0,-1)
+          if (zona.mostrar_nom !== false) {
+            ctx.fillStyle = 'rgba(0,0,0,0.3)'
+            ctx.font = `${midaText}px system-ui`
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            ctx.fillText(zona.codi, textX, textY)
           }
-          if (text !== cultiusZona[0].nom) text += '…'
-          ctx.fillText(text, textX, textY)
+        } else if (cultiusZona.length === 1) {
+          if (zona.mostrar_nom !== false) {
+            ctx.fillStyle = 'rgba(0,0,0,0.7)'
+            ctx.font = `bold ${midaText}px system-ui`
+            ctx.textAlign = 'center'
+            ctx.textBaseline = 'middle'
+            let text = cultiusZona[0].nom
+            while (ctx.measureText(text).width > amplada * 0.85 && text.length > 3) {
+              text = text.slice(0,-1)
+            }
+            if (text !== cultiusZona[0].nom) text += '…'
+            ctx.fillText(text, textX, textY)
+          }
         } else if (cultiusZona.length === 2) {
           const midaTextPetit = Math.max(7, midaText * 0.8)
           ctx.font = `${midaTextPetit}px system-ui`
