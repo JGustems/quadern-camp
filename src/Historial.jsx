@@ -22,7 +22,7 @@ export default function Historial({ zones, onTancar }) {
       .from('registres')
       .select(`
         *,
-        zones(codi, nom),
+        zones(codi, nom, camp_id, camps(nom, pobles(nom))),
         cultius(nom),
         varietats(nom),
         tasques(nom),
@@ -33,6 +33,75 @@ export default function Historial({ zones, onTancar }) {
       .order('data', { ascending: false })
     setRegistres(data || [])
     setCarregant(false)
+
+    // Actualitzar meteo dels registres que no en tenen
+    actualitzaMeteoHistorial(data || [])
+  }
+
+  async function actualitzaMeteoHistorial(registres) {
+    const COORDS = {
+      'All': { lat: 41.4731, lon: 1.5189 },
+      'Begues': { lat: 41.3397, lon: 1.8731 },
+      'Estoll': { lat: 41.5578, lon: 1.4889 },
+      'Alp': { lat: 42.3718, lon: 1.8843 },
+    }
+
+    const sensePluja = registres.filter(r => r.temp_max === null && r.data)
+    if (!sensePluja.length) return
+
+    // Processar de 5 en 5 per no fer massa crides
+    const lot = sensePluja.slice(0, 5)
+
+    for (const r of lot) {
+      try {
+        const poblenom = r.zones?.camps?.pobles?.nom
+        const coord = COORDS[poblenom] || { lat: 41.38, lon: 2.17 }
+
+        const dataInici = new Date(r.data)
+        dataInici.setDate(dataInici.getDate() - 7)
+        const dataFi = new Date(r.data)
+        dataFi.setDate(dataFi.getDate() + 7)
+        const di = dataInici.toISOString().split('T')[0]
+        const df = dataFi.toISOString().split('T')[0]
+
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${coord.lat}&longitude=${coord.lon}&daily=temperature_2m_max,temperature_2m_min,weathercode,precipitation_sum&timezone=Europe/Madrid&start_date=${di}&end_date=${df}`
+        const resp = await fetch(url)
+        const json = await resp.json()
+        if (!json.daily) continue
+
+        const dies = json.daily.time
+        const idx = dies.indexOf(r.data)
+        if (idx < 0) continue
+
+        const plujaPassada = json.daily.precipitation_sum.slice(0, idx).reduce((s,v) => s+(v||0), 0)
+        const plujaFutura = json.daily.precipitation_sum.slice(idx+1).reduce((s,v) => s+(v||0), 0)
+        const jaPassat = new Date(r.data) <= new Date(new Date().setDate(new Date().getDate()-7))
+
+        await supabase.from('registres').update({
+          temp_max: Math.round(json.daily.temperature_2m_max[idx]),
+          temp_min: Math.round(json.daily.temperature_2m_min[idx]),
+          codi_temps: json.daily.weathercode[idx],
+          pluja_setmana: parseFloat(plujaPassada.toFixed(1)),
+          pluja_prevista: parseFloat(plujaFutura.toFixed(1)),
+          pluja_real: jaPassat ? parseFloat(plujaFutura.toFixed(1)) : null,
+          meteo_actualitzada: jaPassat,
+        }).eq('id', r.id)
+
+      } catch(e) {
+        console.log('Error meteo registre', r.id, e.message)
+      }
+    }
+
+    // Recarregar si hem actualitzat alguna cosa
+    if (lot.length > 0) {
+      const zonaIds = zones.map(z => z.id)
+      const { data } = await supabase
+        .from('registres')
+        .select(`*, zones(codi, nom, camp_id, camps(nom, pobles(nom))), cultius(nom), varietats(nom), tasques(nom), subtasques(nom), usuaris(nom)`)
+        .in('zona_id', zonaIds)
+        .order('data', { ascending: false })
+      setRegistres(data || [])
+    }
   }
 
   function agrupaPer(clau) {
