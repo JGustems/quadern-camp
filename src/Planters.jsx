@@ -164,7 +164,7 @@ export default function Planters({ onTancar }) {
                 {plantersActius.map(p => (
                   <div key={p.id}
                     style={{...styles.planterItem, ...(planterActiu?.id===p.id?styles.planterActiu:{})}}
-                    onClick={() => { setPlanterActiu(p); setVistaActiva('editar'); setCellaSeleccionada(null) }}>
+                    onClick={() => { setPlanterActiu(p); setVistaActiva('editar'); setCellaSeleccionada(null); setCellesSeleccionades([]) }}>
                     <div style={styles.planterNom}>{p.nom}</div>
                     <div style={styles.planterInfo}>{p.files}×{p.columnes} · {p.ubicacio}</div>
                     <div style={styles.planterData}>{new Date(p.data_inici).toLocaleDateString('ca-ES')}</div>
@@ -178,7 +178,7 @@ export default function Planters({ onTancar }) {
                 {plantersGastats.map(p => (
                   <div key={p.id}
                     style={{...styles.planterItem, opacity:0.6, ...(planterActiu?.id===p.id?styles.planterActiu:{})}}
-                    onClick={() => { setPlanterActiu(p); setVistaActiva('editar'); setCellaSeleccionada(null) }}>
+                    onClick={() => { setPlanterActiu(p); setVistaActiva('editar'); setCellaSeleccionada(null); setCellesSeleccionades([]) }}>
                     <div style={styles.planterNom}>{p.nom}</div>
                     <div style={styles.planterInfo}>{p.files}×{p.columnes} · {p.ubicacio}</div>
                   </div>
