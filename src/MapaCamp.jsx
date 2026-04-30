@@ -383,9 +383,7 @@ function handleMouseMove(e) {
         onMouseLeave={handleMouseLeave}
         style={{cursor:'pointer', borderRadius:'8px', border:'1px solid #ddd', display:'block', flex:1, width:'100%'}}/>
   )
-      
-}
-{tooltip && (
+     {tooltip && (
         <div style={{
           position:'fixed',
           left: tooltip.x + 12,
@@ -413,3 +411,5 @@ function handleMouseMove(e) {
           )}
         </div>
       )}
+ 
+}
