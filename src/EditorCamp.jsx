@@ -525,7 +525,29 @@ setZones(prev => prev.filter(z => !idsExistents.includes(z.id)))
     setZonesSeleccionades([])
     afegirMissatge(`${idsAEliminar.length} zona(es) eliminada(es)`, 'ok')
   }
+function moureZona(direccio) {
+    if (zonesSeleccionades.length !== 1) return
+    const zona = zonesSeleccionades[0]
+    const idx = zones.findIndex(z => (z.id && z.id===zona.id)||(z.tempId && z.tempId===zona.tempId))
+    if (idx < 0) return
+    const nouIdx = direccio === 'amunt' ? idx - 1 : idx + 1
+    if (nouIdx < 0 || nouIdx >= zones.length) return
+    const novesZones = [...zones]
+    ;[novesZones[idx], novesZones[nouIdx]] = [novesZones[nouIdx], novesZones[idx]]
+    // Actualitzar ordre
+    novesZones.forEach((z, i) => { z.ordre = i })
+    setZones(novesZones)
+  }
 
+  function toggleMostrarNom(valor) {
+    setZones(prev => prev.map(z => {
+      if ((z.id && z.id===zonesSeleccionades[0].id)||(z.tempId && z.tempId===zonesSeleccionades[0].tempId)) {
+        return {...z, mostrar_nom: valor}
+      }
+      return z
+    }))
+    setZonesSeleccionades(prev => prev.map(z => ({...z, mostrar_nom: valor})))
+  }
   async function guardar() {
     setGuardant(true)
     setMissatges([])
@@ -558,6 +580,8 @@ setZones(prev => prev.filter(z => !idsExistents.includes(z.id)))
         amplada_m: z.amplada_m || 1.5, llargada_m: z.llargada_m || 80,
         forma_geojson: forma, color: z.color || null,
         nom_posicio: nomPosicions[z.id] || null,
+        ordre: z.ordre ?? 0,
+        mostrar_nom: z.mostrar_nom !== false,
       }).eq('id', z.id)
       }
 
@@ -579,6 +603,8 @@ setZones(prev => prev.filter(z => !idsExistents.includes(z.id)))
             amplada_m: z.amplada_m || 1.5, llargada_m: z.llargada_m || 80,
             forma_geojson: forma, color: z.color || null,
           nom_posicio: nomPosicions[z.tempId] || null,
+          ordre: z.ordre ?? 0,
+          mostrar_nom: z.mostrar_nom !== false,
         }
       })
         const { error } = await supabase.from('zones').insert(zonesAInserir)
@@ -762,6 +788,28 @@ setZones(prev => prev.filter(z => !idsExistents.includes(z.id)))
                     <button style={styles.botoPrimari} onClick={actualitzarZonesSeleccionades}>
                       Actualitzar {zonesSeleccionades.length > 1 ? `${zonesSeleccionades.length} zones` : 'zona'}
                     </button>
+                    {zonesSeleccionades.length === 1 && (
+                      <div style={{display:'flex', gap:'6px', marginTop:'6px'}}>
+                        <button style={{...styles.botoPrimari, background:'#888', flex:1}}
+                          onClick={() => moureZona('amunt')}>
+                          ↑ Pujar
+                        </button>
+                        <button style={{...styles.botoPrimari, background:'#888', flex:1}}
+                          onClick={() => moureZona('avall')}>
+                          ↓ Baixar
+                        </button>
+                      </div>
+                    )}
+                    {zonesSeleccionades.length === 1 && (
+                      <div style={{marginTop:'6px'}}>
+                        <label style={{display:'flex', alignItems:'center', gap:'8px', fontSize:'13px', color:'#555', cursor:'pointer'}}>
+                          <input type="checkbox"
+                            checked={zonesSeleccionades[0].mostrar_nom !== false}
+                            onChange={e => toggleMostrarNom(e.target.checked)}/>
+                          Mostrar nom al mapa
+                        </label>
+                      </div>
+                    )}
                     <button style={{...styles.botoPrimari, background:'#e55', marginTop:'6px'}}
                       onClick={eliminarZonesSeleccionades}>
                       Eliminar {zonesSeleccionades.length > 1 ? `${zonesSeleccionades.length} zones` : 'zona'}
