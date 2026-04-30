@@ -1,8 +1,11 @@
 import { useEffect, useRef } from 'react'
+const tooltipRef = useRef(null)
+  const [tooltip, setTooltip] = useState(null)
 
 export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona, onSeleccionaFila, cultiusActius, dataConsulta, onCanviaData, modeMovil }) {
-  const canvasRef = useRef(null)
+const canvasRef = useRef(null)
   const containerRef = useRef(null)
+  const tooltipRef = useRef(null)
 
   useEffect(() => { dibuixa() }, [zones, zonesSeleccionades, cultiusActius])
 
@@ -296,7 +299,33 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     const escala = calcularEscala(bbox, canvas.width, canvas.height)
     return { x: cx / escala + bbox.minX, y: cy / escala + bbox.minY }
   }
+function handleMouseMove(e) {
+    if (modeMovil) return
+    const {x, y} = getCanvasPos(e)
+    
+    for (const zona of zones) {
+      const pts = getPts(zona)
+      if (pts.length && ptInPoly(x, y, pts)) {
+        const cultiusZona = cultiusActius[zona.id] || []
+        if (cultiusZona.length > 0) {
+          setTooltip({
+            x: e.clientX,
+            y: e.clientY,
+            zona: zona.codi,
+            cultius: cultiusZona,
+          })
+        } else {
+          setTooltip({ x: e.clientX, y: e.clientY, zona: zona.codi, cultius: [] })
+        }
+        return
+      }
+    }
+    setTooltip(null)
+  }
 
+  function handleMouseLeave() {
+    setTooltip(null)
+  }
   function handleClick(e) {
     const {x, y} = getCanvasPos(e)
     for (const zona of zones) {
@@ -350,7 +379,37 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
         </div>
       )}
       <canvas ref={canvasRef} onClick={handleClick}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
         style={{cursor:'pointer', borderRadius:'8px', border:'1px solid #ddd', display:'block', flex:1, width:'100%'}}/>
-    </div>
   )
+      
 }
+{tooltip && (
+        <div style={{
+          position:'fixed',
+          left: tooltip.x + 12,
+          top: tooltip.y - 10,
+          background:'rgba(0,0,0,0.85)',
+          color:'white',
+          padding:'8px 12px',
+          borderRadius:'8px',
+          fontSize:'12px',
+          pointerEvents:'none',
+          zIndex:1000,
+          maxWidth:'200px',
+          lineHeight:'1.5',
+        }}>
+          <div style={{fontWeight:'600', marginBottom:'4px'}}>Zona {tooltip.zona}</div>
+          {tooltip.cultius.length === 0 ? (
+            <div style={{color:'#aaa'}}>Sense cultiu actiu</div>
+          ) : (
+            tooltip.cultius.map((c, i) => (
+              <div key={i} style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                <div style={{width:'8px', height:'8px', borderRadius:'2px', background:c.color||'#ddd', flexShrink:0}}/>
+                <span>{c.nom}{c.varietat && c.varietat !== '-' ? ` · ${c.varietat}` : ''}</span>
+              </div>
+            ))
+          )}
+        </div>
+      )}
