@@ -14,6 +14,16 @@ export default function AppMovil({
   const [mostrarSelectorCamp, setMostrarSelectorCamp] = useState(false)
   const [mostrarFormulari, setMostrarFormulari] = useState(false)
   const [mostrarHistorial, setMostrarHistorial] = useState(false)
+  const [zonaInfo, setZonaInfo] = useState(null)
+
+  function handleToggleZona(zona) {
+    onToggleZona(zona)
+    const cultiusZona = cultiusActius?.[zona.id]
+    setZonaInfo({
+      zona,
+      cultius: Array.isArray(cultiusZona) ? cultiusZona : cultiusZona ? [cultiusZona] : []
+    })
+  }
 
   function campAmbPoble() {
     return { ...campSeleccionat, poble: pobleSeleccionat }
