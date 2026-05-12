@@ -82,13 +82,61 @@ export default function AppMovil({
                   camp={campSeleccionat}
                   zones={zones}
                   zonesSeleccionades={zonesSeleccionades}
-                  onToggleZona={onToggleZona}
+                  onToggleZona={handleToggleZona}
                   onSeleccionaFila={onSeleccionaFila}
                   cultiusActius={cultiusActius}
                   dataConsulta={dataConsulta}
                   onCanviaData={onCanviaData}
                   modeMovil={true}
                 />
+                {zonaInfo && (
+                  <div style={{
+                    position:'absolute', bottom:0, left:0, right:0,
+                    background:'white', borderTop:'1px solid #eee',
+                    borderRadius:'16px 16px 0 0',
+                    padding:'12px 16px 8px',
+                    boxShadow:'0 -4px 20px rgba(0,0,0,0.1)',
+                    zIndex:10,
+                  }}>
+                    <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between'}}>
+                      <div style={{flex:1}}>
+                        <div style={{fontSize:'13px', fontWeight:'600', color:'#333', marginBottom:'4px'}}>
+                          Zona {zonaInfo.zona.codi}
+                          {zonaInfo.zona.nom && zonaInfo.zona.nom !== zonaInfo.zona.codi && ` · ${zonaInfo.zona.nom}`}
+                        </div>
+                        {zonaInfo.cultius.length === 0 ? (
+                          <div style={{fontSize:'12px', color:'#aaa'}}>Sense cultiu actiu</div>
+                        ) : (
+                          zonaInfo.cultius.map((c, i) => (
+                            <div key={i} style={{display:'flex', alignItems:'center', gap:'6px', marginBottom:'2px'}}>
+                              <div style={{width:'10px', height:'10px', borderRadius:'2px', background:c.color||'#ddd', flexShrink:0}}/>
+                              <span style={{fontSize:'13px', color:'#333', fontWeight:'500'}}>{c.nom}</span>
+                              {c.varietat && c.varietat !== '-' && (
+                                <span style={{fontSize:'12px', color:'#888'}}>· {c.varietat}</span>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      <button style={{background:'none', border:'none', fontSize:'18px', color:'#aaa', cursor:'pointer', padding:'0 0 0 8px'}}
+                        onClick={() => setZonaInfo(null)}>✕</button>
+                    </div>
+                    <div style={{display:'flex', gap:'8px', marginTop:'10px'}}>
+                      <button style={{flex:1, padding:'10px', background:'#1D9E75', color:'white', border:'none', borderRadius:'8px', fontSize:'13px', fontWeight:'500', cursor:'pointer'}}
+                        onClick={() => { setMostrarFormulari(true) }}>
+                        + Tasca
+                      </button>
+                      <button style={{flex:1, padding:'10px', background:'white', color:'#1D9E75', border:'1px solid #1D9E75', borderRadius:'8px', fontSize:'13px', cursor:'pointer'}}
+                        onClick={() => { setMostrarHistorial(true) }}>
+                        Historial
+                      </button>
+                      <button style={{padding:'10px 14px', background:'white', color:'#888', border:'1px solid #ddd', borderRadius:'8px', fontSize:'13px', cursor:'pointer'}}
+                        onClick={() => setZonaInfo(null)}>
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {zonesSeleccionades.length > 0 && (
                   <div style={styles.seleccioBar}>
                     <span style={styles.seleccioText}>
