@@ -4,6 +4,9 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   const canvasRef = useRef(null)
   const containerRef = useRef(null)
   const [tooltip, setTooltip] = useState(null)
+  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 })
+  const lastTouch = useRef(null)
+  const lastDist = useRef(null)
 
   useEffect(() => { dibuixa() }, [zones, zonesSeleccionades, cultiusActius])
 
@@ -305,7 +308,55 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   }
 
   const llegenda = cultiusUnics()
+function getTouchDist(touches) {
+    const dx = touches[0].clientX - touches[1].clientX
+    const dy = touches[0].clientY - touches[1].clientY
+    return Math.sqrt(dx*dx + dy*dy)
+  }
 
+  function handleTouchStart(e) {
+    if (!modeMovil) return
+    if (e.touches.length === 1) {
+      lastTouch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      lastDist.current = null
+    } else if (e.touches.length === 2) {
+      lastDist.current = getTouchDist(e.touches)
+      lastTouch.current = {
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      }
+    }
+  }
+
+  function handleTouchMove(e) {
+    if (!modeMovil) return
+    e.preventDefault()
+    if (e.touches.length === 1 && lastTouch.current) {
+      const dx = e.touches[0].clientX - lastTouch.current.x
+      const dy = e.touches[0].clientY - lastTouch.current.y
+      setTransform(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }))
+      lastTouch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+    } else if (e.touches.length === 2 && lastDist.current) {
+      const novaDist = getTouchDist(e.touches)
+      const ratio = novaDist / lastDist.current
+      const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2
+      const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2
+      const dx = cx - lastTouch.current.x
+      const dy = cy - lastTouch.current.y
+      setTransform(prev => ({
+        scale: Math.min(Math.max(prev.scale * ratio, 0.5), 5),
+        x: prev.x + dx,
+        y: prev.y + dy,
+      }))
+      lastDist.current = novaDist
+      lastTouch.current = { x: cx, y: cy }
+    }
+  }
+
+  function handleTouchEnd() {
+    lastTouch.current = null
+    lastDist.current = null
+  }
   return (
     <div ref={containerRef} style={{width:'100%', height:'100%', display:'flex', flexDirection:'column', padding: modeMovil?'4px':'16px', overflow:'hidden'}}>
       {!modeMovil && (
@@ -322,6 +373,18 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
                 Avui
               </button>
             )}
+            {modeMovil && transform.scale !== 1 && (
+        <button
+          onClick={() => setTransform({ x:0, y:0, scale:1 })}
+          style={{
+            position:'absolute', top:'8px', right:'8px',
+            background:'rgba(255,255,255,0.9)', border:'1px solid #ddd',
+            borderRadius:'6px', padding:'4px 8px', fontSize:'12px',
+            cursor:'pointer', zIndex:5,
+          }}>
+          ↺ Reset zoom
+        </button>
+      )}
           </div>
           {Object.keys(llegenda).length > 0 && (
             <div style={{display:'flex', flexWrap:'wrap', gap:'8px'}}>
@@ -335,10 +398,51 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
           )}
         </div>
       )}
-      <canvas ref={canvasRef} onClick={handleClick}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        style={{cursor:'pointer', borderRadius:'8px', border:'1px solid #ddd', display:'block', flex:1, width:'100%'}}/>
+      <div style={{flex:1, overflow:'hidden', position:'relative', touchAction:'none'}}>
+        <canvas ref={canvasRef} onClick={handleClick}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={handleMouseLeave}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          style={{
+            cursor:'pointer',
+            borderRadius: modeMovil ? '0' : '8px',
+            border: modeMovil ? 'none' : '1px solid #ddd',
+            display:'block',
+            width:'100%', height:'100%',
+            transform: modeMovil ? `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` : 'none',
+            transformOrigin: '0 0',
+          }}/>
+        {tooltip && !modeMovil && (
+          <div style={{
+            position:'fixed',
+            left: tooltip.x + 14,
+            top: tooltip.y - 10,
+            background:'rgba(0,0,0,0.85)',
+            color:'white',
+            padding:'8px 12px',
+            borderRadius:'8px',
+            fontSize:'12px',
+            pointerEvents:'none',
+            zIndex:1000,
+            maxWidth:'220px',
+            lineHeight:'1.6',
+          }}>
+            <div style={{fontWeight:'600', marginBottom:'4px', fontSize:'13px'}}>Zona {tooltip.zona}</div>
+            {tooltip.cultius.length === 0 ? (
+              <div style={{color:'#aaa'}}>Sense cultiu actiu</div>
+            ) : (
+              tooltip.cultius.map((c, i) => (
+                <div key={i} style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                  <div style={{width:'8px', height:'8px', borderRadius:'2px', background:c.color||'#ddd', flexShrink:0}}/>
+                  <span>{c.nom}{c.varietat && c.varietat !== '-' ? ` · ${c.varietat}` : ''}</span>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
       {tooltip && (
         <div style={{
           position:'fixed',
