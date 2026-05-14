@@ -331,23 +331,29 @@ function getTouchDist(touches) {
   function handleTouchMove(e) {
     if (!modeMovil) return
     e.preventDefault()
-    if (e.touches.length === 1 && lastTouch.current) {
+
+    if (e.touches.length === 1 && lastTouch.current && !lastDist.current) {
       const dx = e.touches[0].clientX - lastTouch.current.x
       const dy = e.touches[0].clientY - lastTouch.current.y
       setTransform(prev => ({ ...prev, x: prev.x + dx, y: prev.y + dy }))
       lastTouch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
-    } else if (e.touches.length === 2 && lastDist.current) {
+
+    } else if (e.touches.length === 2 && lastDist.current !== null) {
       const novaDist = getTouchDist(e.touches)
       const ratio = novaDist / lastDist.current
       const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2
       const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2
       const dx = cx - lastTouch.current.x
       const dy = cy - lastTouch.current.y
-      setTransform(prev => ({
-        scale: Math.min(Math.max(prev.scale * ratio, 0.5), 5),
-        x: prev.x + dx,
-        y: prev.y + dy,
-      }))
+
+      setTransform(prev => {
+        const novaScale = Math.min(Math.max(prev.scale * ratio, 0.3), 8)
+        // Zoom respecte al punt central dels dits
+        const novaX = cx - (cx - prev.x) * ratio + dx
+        const novaY = cy - (cy - prev.y) * ratio + dy
+        return { scale: novaScale, x: novaX, y: novaY }
+      })
+
       lastDist.current = novaDist
       lastTouch.current = { x: cx, y: cy }
     }
@@ -414,6 +420,34 @@ function getTouchDist(touches) {
             transform: modeMovil ? `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})` : 'none',
             transformOrigin: '0 0',
           }}/>
+        {modeMovil && (
+        <div style={{
+          position:'absolute', top:'8px', left:'8px', right:'8px',
+          display:'flex', justifyContent:'space-between', alignItems:'center',
+          pointerEvents:'none', zIndex:5,
+        }}>
+          <input
+            type="date"
+            value={dataConsulta || ''}
+            onChange={e => { const val=e.target.value; if(val&&val.length===10) onCanviaData&&onCanviaData(val); else if(!val) onCanviaData&&onCanviaData('') }}
+            style={{
+              padding:'5px 10px', border:'1px solid #ddd', borderRadius:'6px',
+              fontSize:'13px', background:'rgba(255,255,255,0.95)',
+              pointerEvents:'all',
+            }}/>
+          {transform.scale !== 1 && (
+            <button
+              onClick={() => setTransform({ x:0, y:0, scale:1 })}
+              style={{
+                background:'rgba(255,255,255,0.95)', border:'1px solid #ddd',
+                borderRadius:'6px', padding:'5px 10px', fontSize:'12px',
+                cursor:'pointer', pointerEvents:'all',
+              }}>
+              ↺ Reset
+            </button>
+          )}
+        </div>
+      )}
         {tooltip && !modeMovil && (
           <div style={{
             position:'fixed',
