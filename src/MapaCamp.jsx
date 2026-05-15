@@ -281,11 +281,12 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
       const pts = getPts(zona)
       if (pts.length && ptInPoly(x, y, pts)) {
         const cultiusZona = cultiusActius[zona.id] || []
+        const tots = cultiusZona.tots || cultiusZona
         setTooltip({
           x: e.clientX,
           y: e.clientY,
           zona: zona.codi,
-          cultius: cultiusZona,
+          cultius: tots,
         })
         return
       }
