@@ -8,7 +8,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   const lastTouch = useRef(null)
   const lastDist = useRef(null)
 
-  useEffect(() => { dibuixa() }, [zones, zonesSeleccionades, cultiusActius])
+  useEffect(() => { dibuixa() }, [zones, zonesSeleccionades, cultiusActius, transform])
 
   function estaSeleccionada(zona) {
     return zonesSeleccionades.some(z => z.id === zona.id)
@@ -150,8 +150,15 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
 
     const W = container.clientWidth - (modeMovil ? 8 : 32)
     const H = container.clientHeight - (modeMovil ? 20 : 80)
-    canvas.width = W
-    canvas.height = H
+
+    // Al mòbil, augmentar la resolució del canvas segons el zoom
+    const pixelRatio = modeMovil ? Math.max(transform.scale, 1) * window.devicePixelRatio : 1
+    canvas.width = W * (modeMovil ? pixelRatio : 1)
+    canvas.height = H * (modeMovil ? pixelRatio : 1)
+    if (modeMovil) {
+      canvas.style.width = W + 'px'
+      canvas.style.height = H + 'px'
+    }
 
     const ctx = canvas.getContext('2d')
     ctx.clearRect(0,0,W,H)
@@ -184,12 +191,13 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
       const cultiusZona = cultiusActius[zona.id] || []
       dibuixaZonaAmbCultius(ctx, zona, pts, cultiusZona, sel, bbox, escala)
 
-      if (!modeMovil) {
+      if (!modeMovil || transform.scale > 2) {
         const c = centroid(pts)
         const {cx,cy} = toCanvas(c.x,c.y,bbox,escala)
         const amplada = (Math.max(...pts.map(p=>p.x)) - Math.min(...pts.map(p=>p.x))) * escala
         const alcada = (Math.max(...pts.map(p=>p.y)) - Math.min(...pts.map(p=>p.y))) * escala
-        const midaText = Math.min(Math.max(8, Math.min(amplada, alcada) * 0.25), 13)
+        const midaBase = Math.min(Math.max(8, Math.min(amplada, alcada) * 0.25), 13)
+        const midaText = modeMovil ? midaBase / transform.scale : midaBase
 
         const nomPos = zona.nom_posicio
         const textX = nomPos ? toCanvas(nomPos.x, nomPos.y, bbox, escala).cx : cx
