@@ -162,7 +162,6 @@ export default function App() {
       const regsZona = (data || []).filter(r => r.zona_id === zona.id)
       const ultimaNetejar = regsZona.filter(r => r.tasques?.nom === 'Netejar')[0]
 
-      // Agafar totes les plantacions posteriors a l'últim netejar
       const plantacions = regsZona.filter(r => {
         if (!tasquesPlantacio.includes(r.tasques?.nom)) return false
         if (ultimaNetejar && new Date(r.data) <= new Date(ultimaNetejar.data)) return false
@@ -171,23 +170,39 @@ export default function App() {
 
       if (!plantacions.length) return
 
-      // Agrupar per cultiu (no per varietat) — dues varietats del mateix cultiu = 1 color
-      const cultiusActiusZona = []
-      const cultiusVists = new Set()
+      // Totes les combinacions cultiu+varietat (per tooltip i banda mòbil)
+      const totsVists = new Set()
+      const tots = []
       plantacions.forEach(p => {
         const nomCultiu = p.cultius?.nom
-        if (!cultiusVists.has(nomCultiu) && nomCultiu) {
-          cultiusVists.add(nomCultiu)
-          cultiusActiusZona.push({
+        const nomVarietat = p.varietats?.nom
+        if (!nomCultiu) return
+        const clau = `${nomCultiu}||${nomVarietat}`
+        if (!totsVists.has(clau)) {
+          totsVists.add(clau)
+          tots.push({
             nom: nomCultiu,
             color: p.cultius.color,
-            varietat: p.varietats?.nom,
+            varietat: nomVarietat && nomVarietat !== '-' ? nomVarietat : null,
           })
         }
       })
 
-      if (cultiusActiusZona.length > 0) {
-        cultiusPerZona[zona.id] = cultiusActiusZona
+      // Agrupat per cultiu (per al color del mapa)
+      const cultiusVists = new Set()
+      const perColor = []
+      tots.forEach(t => {
+        if (!cultiusVists.has(t.nom)) {
+          cultiusVists.add(t.nom)
+          perColor.push(t)
+        }
+      })
+
+      if (tots.length > 0) {
+        // perColor = per dibuixar colors al mapa
+        // tots = per mostrar al tooltip amb totes les varietats
+        cultiusPerZona[zona.id] = perColor
+        cultiusPerZona[zona.id].tots = tots
       }
     })
     setCultiusActius(cultiusPerZona)
