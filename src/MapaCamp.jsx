@@ -8,7 +8,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   const lastTouch = useRef(null)
   const lastDist = useRef(null)
 
-  useEffect(() => { dibuixa() }, [zones, zonesSeleccionades, cultiusActius, transform])
+  useEffect(() => { dibuixa() }, [zones, zonesSeleccionades, cultiusActius])
 
   function estaSeleccionada(zona) {
     return zonesSeleccionades.some(z => z.id === zona.id)
@@ -150,14 +150,11 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
 
     const W = container.clientWidth - (modeMovil ? 8 : 32)
     const H = container.clientHeight - (modeMovil ? 20 : 80)
-
-    // Al mòbil, augmentar la resolució del canvas segons el zoom
-    const pixelRatio = modeMovil ? Math.max(transform.scale, 1) * window.devicePixelRatio : 1
-    canvas.width = W * (modeMovil ? pixelRatio : 1)
-    canvas.height = H * (modeMovil ? pixelRatio : 1)
+    canvas.width = W
+    canvas.height = H
     if (modeMovil) {
-      canvas.style.width = W + 'px'
-      canvas.style.height = H + 'px'
+      canvas.style.width = ''
+      canvas.style.height = ''
     }
 
     const ctx = canvas.getContext('2d')
@@ -191,7 +188,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
       const cultiusZona = cultiusActius[zona.id] || []
       dibuixaZonaAmbCultius(ctx, zona, pts, cultiusZona, sel, bbox, escala)
 
-      if (!modeMovil || transform.scale > 2) {
+      if (!modeMovil) {
         const c = centroid(pts)
         const {cx,cy} = toCanvas(c.x,c.y,bbox,escala)
         const amplada = (Math.max(...pts.map(p=>p.x)) - Math.min(...pts.map(p=>p.x))) * escala
