@@ -19,9 +19,10 @@ export default function AppMovil({
   function handleToggleZona(zona) {
     onToggleZona(zona)
     const cultiusZona = cultiusActius?.[zona.id]
+    const tots = cultiusZona?.tots || (Array.isArray(cultiusZona) ? cultiusZona : cultiusZona ? [cultiusZona] : [])
     setZonaInfo({
       zona,
-      cultius: Array.isArray(cultiusZona) ? cultiusZona : cultiusZona ? [cultiusZona] : []
+      cultius: tots,
     })
   }
 
