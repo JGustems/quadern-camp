@@ -58,20 +58,32 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
 
   // Zoom i drag ratolí
   function handleWheel(e) {
-    e.preventDefault()
-    const svg = svgRef.current
-    if (!svg) return
-    const rect = svg.getBoundingClientRect()
-    const [vbX, vbY, vbW, vbH] = vb.split(' ').map(Number)
-    const factor = e.deltaY > 0 ? 1.1 : 0.9
-    const mx = vbX + (e.clientX - rect.left) / rect.width * vbW
-    const my = vbY + (e.clientY - rect.top) / rect.height * vbH
+  e.preventDefault()
+  const svg = svgRef.current
+  if (!svg) return
+  const rect = svg.getBoundingClientRect()
+  const factor = e.deltaY > 0 ? 1.1 : 0.9
+
+  // Guardem les posicions del ratolí en constants immutables
+  const clientX = e.clientX
+  const clientY = e.clientY
+
+  setViewBox(prevVb => {
+    // Si prevVb és null, calculem el bbox inicial tal com fas al render
+    const actualVb = prevVb || `${bbox.minX} ${bbox.minY} ${bbox.w} ${bbox.h}`
+    const [vbX, vbY, vbW, vbH] = actualVb.split(' ').map(Number)
+    
+    const mx = vbX + (clientX - rect.left) / rect.width * vbW
+    const my = vbY + (clientY - rect.top) / rect.height * vbH
+    
     const novaW = vbW * factor
     const novaH = vbH * factor
     const novaX = mx - (mx - vbX) * factor
     const novaY = my - (my - vbY) * factor
-    setViewBox(`${novaX} ${novaY} ${novaW} ${novaH}`)
-  }
+    
+    return `${novaX} ${novaY} ${novaW} ${novaH}`
+  })
+}
 
   function handleMouseDown(e) {
     if (e.button !== 0) return
@@ -80,18 +92,27 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   }
 
   function handleMouseMove(e) {
-    if (dragging && lastPos) {
-      const svg = svgRef.current
-      if (!svg) return
-      const rect = svg.getBoundingClientRect()
-      const [,, vbW, vbH] = vb.split(' ').map(Number)
-      const dx = -(e.clientX - lastPos.x) / rect.width * vbW
-      const dy = -(e.clientY - lastPos.y) / rect.height * vbH
-      const parts = vb.split(' ').map(Number)
-      setViewBox(`${parts[0]+dx} ${parts[1]+dy} ${parts[2]} ${parts[3]}`)
-      setLastPos({ x: e.clientX, y: e.clientY })
-    }
+  if (dragging && lastPos) {
+    const svg = svgRef.current
+    if (!svg) return
+    const rect = svg.getBoundingClientRect()
+    const clientX = e.clientX
+    const clientY = e.clientY
+
+    setViewBox(prevVb => {
+      const actualVb = prevVb || `${bbox.minX} ${bbox.minY} ${bbox.w} ${bbox.h}`
+      const [,, vbW, vbH] = actualVb.split(' ').map(Number)
+      const parts = actualVb.split(' ').map(Number)
+      
+      const dx = -(clientX - lastPos.x) / rect.width * vbW
+      const dy = -(clientY - lastPos.y) / rect.height * vbH
+      
+      return `${parts[0] + dx} ${parts[1] + dy} ${parts[2]} ${parts[3]}`
+    })
+    
+    setLastPos({ x: clientX, y: clientY })
   }
+}
 
   function handleMouseUp() { setDragging(false); setLastPos(null) }
 
