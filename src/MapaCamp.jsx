@@ -44,12 +44,10 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   const draggingRef = useRef(false)
   const startPosRef = useRef(null)
   const lastPosRef = useRef(null)
-  const isClickRef = useRef(true)
 
+  const touchStartPos = useRef(null)
   const lastTouch = useRef(null)
   const lastDist = useRef(null)
-  const touchStartTime = useRef(null)
-  const touchStartPos = useRef(null)
   const isTap = useRef(false)
 
   // Transforma els píxels de la pantalla a coordenades exactes del mapa SVG
@@ -76,7 +74,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   }
 
   function colorZona(zona, cultiusZona, sel) {
-    if (sel) return '#B5D4F4'
+    if (sel) return '#B5D4F4' // Color blau cel de selecció activa
     if (!cultiusZona || cultiusZona.length === 0) return zona.color || '#e8e4de'
     return cultiusZona[0].color || '#C0DD97'
   }
@@ -121,7 +119,6 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     startPosRef.current = { x: e.clientX, y: e.clientY }
     lastPosRef.current = { x: e.clientX, y: e.clientY }
     draggingRef.current = false
-    isClickRef.current = true
   }
 
   // Moviment del ratolí
@@ -131,9 +128,8 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     const dxTotal = e.clientX - startPosRef.current.x
     const dyTotal = e.clientY - startPosRef.current.y
     
-    // Si es mou més de 5 píxels, considerem que està arrossegant el mapa, no clicant
-    if (isClickRef.current && Math.hypot(dxTotal, dyTotal) > 5) {
-      isClickRef.current = false
+    // Si el ratolí es mou més de 8 píxels, s'activa el desplaçament de mapa
+    if (!draggingRef.current && Math.hypot(dxTotal, dyTotal) > 8) {
       draggingRef.current = true
       if (svgRef.current) svgRef.current.style.cursor = 'grabbing'
     }
@@ -159,15 +155,20 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
 
   // Final del clic (Ordinador)
   function handleMouseUp(e) { 
-    if (isClickRef.current && startPosRef.current) {
-      // S'ha fet un clic net: processem la selecció de zona amb coordenades reals
-      const coords = getSVGCoordinates(e.clientX, e.clientY)
-      if (coords) {
-        for (const zona of [...zones].sort((a,b) => (b.ordre||0)-(a.ordre||0))) {
-          const pts = getPts(zona)
-          if (pts.length && ptInPoly(coords.x, coords.y, pts)) {
-            onToggleZona(zona)
-            break
+    if (startPosRef.current) {
+      const dxTotal = e.clientX - startPosRef.current.x
+      const dyTotal = e.clientY - startPosRef.current.y
+      
+      // Si gairebé no s'ha mogut el ratolí, és un clic de selecció
+      if (Math.hypot(dxTotal, dyTotal) < 10) {
+        const coords = getSVGCoordinates(e.clientX, e.clientY)
+        if (coords) {
+          for (const zona of [...zones].sort((a,b) => (b.ordre||0)-(a.ordre||0))) {
+            const pts = getPts(zona)
+            if (pts.length && ptInPoly(coords.x, coords.y, pts)) {
+              onToggleZona(zona)
+              break
+            }
           }
         }
       }
@@ -181,7 +182,6 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   // Gestió de moviments tàctils (Mòbil)
   function handleTouchStart(e) {
     if (e.touches.length === 1) {
-      touchStartTime.current = Date.now()
       touchStartPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
       isTap.current = true
       lastTouch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
@@ -204,16 +204,23 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     const [vbX, vbY, vbW, vbH] = vbRef.current.split(' ').map(Number)
 
     if (e.touches.length === 1 && lastTouch.current && !lastDist.current) {
-      const dx = e.touches[0].clientX - lastTouch.current.x
-      const dy = e.touches[0].clientY - lastTouch.current.y
-      if (Math.hypot(dx, dy) > 7) isTap.current = false
+      const touch = e.touches[0]
+      
+      // Marge intel·ligent: si es mou en total més de 22 píxels des de l'inici, és un arrossegament (no un toc)
+      const distAssegurada = Math.hypot(touch.clientX - touchStartPos.current.x, touch.clientY - touchStartPos.current.y)
+      if (distAssegurada > 22) {
+        isTap.current = false
+      }
+      
+      const dx = touch.clientX - lastTouch.current.x
+      const dy = touch.clientY - lastTouch.current.y
       const dxSvg = -dx / rect.width * vbW
       const dySvg = -dy / rect.height * vbH
       
       const nouVb = `${vbX+dxSvg} ${vbY+dySvg} ${vbW} ${vbH}`
       vbRef.current = nouVb
       setViewBox(nouVb)
-      lastTouch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      lastTouch.current = { x: touch.clientX, y: touch.clientY }
 
     } else if (e.touches.length === 2 && lastDist.current !== null) {
       isTap.current = false
@@ -239,24 +246,28 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   }
 
   function handleTouchEnd(e) {
-    if (isTap.current && touchStartTime.current && Date.now() - touchStartTime.current < 300) {
+    if (isTap.current && touchStartPos.current) {
       const touch = e.changedTouches[0]
-      const coords = getSVGCoordinates(touch.clientX, touch.clientY)
+      // Confirmació final de seguretat de distància curta pel dit
+      const distFinal = Math.hypot(touch.clientX - touchStartPos.current.x, touch.clientY - touchStartPos.current.y)
       
-      if (coords) {
-        for (const zona of [...zones].sort((a,b) => (b.ordre||0)-(a.ordre||0))) {
-          const pts = getPts(zona)
-          if (pts.length && ptInPoly(coords.x, coords.y, pts)) {
-            onToggleZona(zona)
-            break
+      if (distFinal < 25) {
+        const coords = getSVGCoordinates(touch.clientX, touch.clientY)
+        if (coords) {
+          for (const zona of [...zones].sort((a,b) => (b.ordre||0)-(a.ordre||0))) {
+            const pts = getPts(zona)
+            if (pts.length && ptInPoly(coords.x, coords.y, pts)) {
+              onToggleZona(zona)
+              break
+            }
           }
         }
       }
     }
     lastTouch.current = null
     lastDist.current = null
+    touchStartPos.current = null
     isTap.current = false
-    touchStartTime.current = null
   }
 
   function getTouchDist(touches) {
@@ -431,7 +442,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
                   textAnchor="middle"
                   dominantBaseline="middle"
                   fontSize={mida}
-                  fontWeight={cultiusZona.length > 0 ? 'bold' : 'normal'}
+                  fontWeight={cultiusZona.length > 0 || sel ? 'bold' : 'normal'}
                   fill={sel ? '#042C53' : cultiusZona.length > 0 ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.3)'}
                   style={{pointerEvents:'none', userSelect:'none'}}>
                   {sel ? zona.codi :
