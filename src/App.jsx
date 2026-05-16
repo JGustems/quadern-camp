@@ -320,6 +320,11 @@ export default function App() {
 
       <div style={styles.contingut}>
         <div style={styles.sidebar}>
+          <div
+            style={{...styles.item, background:'#E1F5EE', color:'#0F6E56', fontWeight:'500', marginBottom:'8px', display:'flex', alignItems:'center', gap:'6px'}}
+            onClick={() => setMostrarPlanters(true)}>
+            🌱 Planters
+          </div>
           <div style={styles.seccio}>Pobles</div>
           {pobles.map(p => (
             <div key={p.id}
