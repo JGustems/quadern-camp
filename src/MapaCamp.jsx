@@ -8,6 +8,9 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   const [lastPos, setLastPos] = useState(null)
   const lastTouch = useRef(null)
   const lastDist = useRef(null)
+  const touchStartTime = useRef(null)
+  const touchStartPos = useRef(null)
+  const isTap = useRef(false)
 
   function getPts(zona) {
     if (zona.forma_geojson?.points) return zona.forma_geojson.points
@@ -101,9 +104,13 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
 
   function handleTouchStart(e) {
     if (e.touches.length === 1) {
+      touchStartTime.current = Date.now()
+      touchStartPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      isTap.current = true
       lastTouch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
       lastDist.current = null
     } else if (e.touches.length === 2) {
+      isTap.current = false
       lastDist.current = getTouchDist(e.touches)
       lastTouch.current = {
         x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
@@ -121,37 +128,60 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     const [vbX, vbY, vbW, vbH] = parts
 
     if (e.touches.length === 1 && lastTouch.current && !lastDist.current) {
-      const dx = -(e.touches[0].clientX - lastTouch.current.x) / rect.width * vbW
-      const dy = -(e.touches[0].clientY - lastTouch.current.y) / rect.height * vbH
-      setViewBox(`${vbX+dx} ${vbY+dy} ${vbW} ${vbH}`)
+      const dx = e.touches[0].clientX - lastTouch.current.x
+      const dy = e.touches[0].clientY - lastTouch.current.y
+      // Si s'ha mogut més de 5px, no és un tap
+      if (Math.hypot(dx, dy) > 5) isTap.current = false
+      const dxSvg = -dx / rect.width * vbW
+      const dySvg = -dy / rect.height * vbH
+      setViewBox(`${vbX+dxSvg} ${vbY+dySvg} ${vbW} ${vbH}`)
       lastTouch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
 
     } else if (e.touches.length === 2 && lastDist.current !== null) {
+      isTap.current = false
       const novaDist = getTouchDist(e.touches)
-      const ratio = lastDist.current / novaDist // invers per zoom
+      const ratio = lastDist.current / novaDist
       const cx = (e.touches[0].clientX + e.touches[1].clientX) / 2
       const cy = (e.touches[0].clientY + e.touches[1].clientY) / 2
       const dx = -(cx - lastTouch.current.x) / rect.width * vbW
       const dy = -(cy - lastTouch.current.y) / rect.height * vbH
-
-      // Punt de zoom en coordenades SVG
       const svgCx = vbX + (cx - rect.left) / rect.width * vbW
       const svgCy = vbY + (cy - rect.top) / rect.height * vbH
-
       const novaW = Math.min(Math.max(vbW * ratio, bbox.w * 0.1), bbox.w * 5)
       const novaH = Math.min(Math.max(vbH * ratio, bbox.h * 0.1), bbox.h * 5)
       const novaX = svgCx - (svgCx - vbX) * ratio + dx
       const novaY = svgCy - (svgCy - vbY) * ratio + dy
-
       setViewBox(`${novaX} ${novaY} ${novaW} ${novaH}`)
       lastDist.current = novaDist
       lastTouch.current = { x: cx, y: cy }
     }
   }
 
-  function handleTouchEnd() {
+  function handleTouchEnd(e) {
+    // Si és un tap ràpid i curt, processar com a clic
+    if (isTap.current && touchStartTime.current && Date.now() - touchStartTime.current < 300) {
+      const svg = svgRef.current
+      if (!svg) return
+      const rect = svg.getBoundingClientRect()
+      const touch = e.changedTouches[0]
+      const parts = vb.split(' ').map(Number)
+      const [vbX, vbY, vbW, vbH] = parts
+      const svgX = vbX + (touch.clientX - rect.left) / rect.width * vbW
+      const svgY = vbY + (touch.clientY - rect.top) / rect.height * vbH
+
+      // Trobar zona clicada
+      for (const zona of [...zones].sort((a,b) => (b.ordre||0)-(a.ordre||0))) {
+        const pts = getPts(zona)
+        if (pts.length && ptInPoly(svgX, svgY, pts)) {
+          onToggleZona(zona)
+          break
+        }
+      }
+    }
     lastTouch.current = null
     lastDist.current = null
+    isTap.current = false
+    touchStartTime.current = null
   }
 
   function resetZoom() {
@@ -256,7 +286,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
 
           return (
             <g key={zona.id}
-              onClick={() => onToggleZona(zona)}
+              onClick={modeMovil ? undefined : () => onToggleZona(zona)}
               onMouseEnter={e => {
                 if (modeMovil) return
                 const tots = cultiusZona.tots || cultiusZona
