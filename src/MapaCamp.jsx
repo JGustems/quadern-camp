@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 
-// Funció matemàtica de seguretat (Ray-casting) per detectar clics dins dels polígons al mòbil
+// Funció matemàtica de precisió per detectar si un punt està dins d'una zona
 function ptInPoly(x, y, pts) {
   let inside = false
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
@@ -38,7 +38,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   const bbox = calcularBbox()
   const inicialVb = `${bbox.minX} ${bbox.minY} ${bbox.w} ${bbox.h}`
   
-  // --- GESTIÓ DEL ZOOM I MOVIMENT ---
+  // --- GESTIÓ ULTRA-PRECISA DE COORDENADES, ZOOM I MOVIMENT ---
   const [viewBox, setViewBox] = useState(inicialVb)
   const vbRef = useRef(inicialVb)
   const draggingRef = useRef(false)
@@ -51,6 +51,21 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   const touchStartTime = useRef(null)
   const touchStartPos = useRef(null)
   const isTap = useRef(false)
+
+  // Transforma els píxels de la pantalla a coordenades exactes del mapa SVG
+  function getSVGCoordinates(clientX, clientY) {
+    const svg = svgRef.current
+    if (!svg) return null
+    const pt = svg.createSVGPoint()
+    pt.x = clientX
+    pt.y = clientY
+    try {
+      const svgP = pt.matrixTransform(svg.getScreenCTM().inverse())
+      return { x: svgP.x, y: svgP.y }
+    } catch (e) {
+      return null
+    }
+  }
 
   function ptsToString(pts) {
     return pts.map(p => `${p.x},${p.y}`).join(' ')
@@ -77,7 +92,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
 
   const llegenda = cultiusUnics()
 
-  // Zoom de la roda del ratolí
+  // Zoom amb la roda del ratolí
   function handleWheel(e) {
     e.preventDefault()
     const svg = svgRef.current
@@ -100,7 +115,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     setViewBox(nouVb)
   }
 
-  // Inici de clic/arrossegament (Ordinador)
+  // Inici de clic o arrossegament (Ordinador)
   function handleMouseDown(e) {
     if (e.button !== 0) return
     startPosRef.current = { x: e.clientX, y: e.clientY }
@@ -109,14 +124,14 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     isClickRef.current = true
   }
 
-  // Moviment del ratolí (Evita micro-moviments que trenquen el clic)
+  // Moviment del ratolí
   function handleMouseMove(e) {
     if (!lastPosRef.current) return
     
     const dxTotal = e.clientX - startPosRef.current.x
     const dyTotal = e.clientY - startPosRef.current.y
     
-    // Si es mou més de 5 píxels, llavors SÍ que és un arrossegament i no un clic
+    // Si es mou més de 5 píxels, considerem que està arrossegant el mapa, no clicant
     if (isClickRef.current && Math.hypot(dxTotal, dyTotal) > 5) {
       isClickRef.current = false
       draggingRef.current = true
@@ -142,19 +157,28 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     }
   }
 
-  function handleMouseUp() { 
+  // Final del clic (Ordinador)
+  function handleMouseUp(e) { 
+    if (isClickRef.current && startPosRef.current) {
+      // S'ha fet un clic net: processem la selecció de zona amb coordenades reals
+      const coords = getSVGCoordinates(e.clientX, e.clientY)
+      if (coords) {
+        for (const zona of [...zones].sort((a,b) => (b.ordre||0)-(a.ordre||0))) {
+          const pts = getPts(zona)
+          if (pts.length && ptInPoly(coords.x, coords.y, pts)) {
+            onToggleZona(zona)
+            break
+          }
+        }
+      }
+    }
     draggingRef.current = false
     lastPosRef.current = null
+    startPosRef.current = null
     if (svgRef.current) svgRef.current.style.cursor = 'grab'
   }
 
   // Gestió de moviments tàctils (Mòbil)
-  function getTouchDist(touches) {
-    const dx = touches[0].clientX - touches[1].clientX
-    const dy = touches[0].clientY - touches[1].clientY
-    return Math.sqrt(dx*dx + dy*dy)
-  }
-
   function handleTouchStart(e) {
     if (e.touches.length === 1) {
       touchStartTime.current = Date.now()
@@ -182,7 +206,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     if (e.touches.length === 1 && lastTouch.current && !lastDist.current) {
       const dx = e.touches[0].clientX - lastTouch.current.x
       const dy = e.touches[0].clientY - lastTouch.current.y
-      if (Math.hypot(dx, dy) > 5) isTap.current = false
+      if (Math.hypot(dx, dy) > 7) isTap.current = false
       const dxSvg = -dx / rect.width * vbW
       const dySvg = -dy / rect.height * vbH
       
@@ -216,19 +240,16 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
 
   function handleTouchEnd(e) {
     if (isTap.current && touchStartTime.current && Date.now() - touchStartTime.current < 300) {
-      const svg = svgRef.current
-      if (!svg) return
-      const rect = svg.getBoundingClientRect()
       const touch = e.changedTouches[0]
-      const [vbX, vbY, vbW, vbH] = vbRef.current.split(' ').map(Number)
-      const svgX = vbX + (touch.clientX - rect.left) / rect.width * vbW
-      const svgY = vbY + (touch.clientY - rect.top) / rect.height * vbH
-
-      for (const zona of [...zones].sort((a,b) => (b.ordre||0)-(a.ordre||0))) {
-        const pts = getPts(zona)
-        if (pts.length && ptInPoly(svgX, svgY, pts)) {
-          onToggleZona(zona)
-          break
+      const coords = getSVGCoordinates(touch.clientX, touch.clientY)
+      
+      if (coords) {
+        for (const zona of [...zones].sort((a,b) => (b.ordre||0)-(a.ordre||0))) {
+          const pts = getPts(zona)
+          if (pts.length && ptInPoly(coords.x, coords.y, pts)) {
+            onToggleZona(zona)
+            break
+          }
         }
       }
     }
@@ -236,6 +257,12 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     lastDist.current = null
     isTap.current = false
     touchStartTime.current = null
+  }
+
+  function getTouchDist(touches) {
+    const dx = touches[0].clientX - touches[1].clientX
+    const dy = touches[0].clientY - touches[1].clientY
+    return Math.sqrt(dx*dx + dy*dy)
   }
 
   function resetZoom() {
@@ -308,7 +335,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={() => { handleMouseUp(); setTooltip(null) }}
+        onMouseLeave={() => { draggingRef.current = false; lastPosRef.current = null; setTooltip(null) }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -336,14 +363,13 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
 
           return (
             <g key={zona.id}
-              onClick={() => onToggleZona(zona)}
               onMouseEnter={e => {
                 if (modeMovil) return
                 const tots = cultiusZona.tots || cultiusZona
                 setTooltip({ x: e.clientX, y: e.clientY, zona: zona.codi, cultius: tots })
               }}
               onMouseLeave={() => setTooltip(null)}
-              style={{cursor:'pointer'}}>
+              style={{pointerEvents:'visiblePainted'}}>
 
               {/* Cas 1: Zona mixta amb 2 cultius */}
               {cultiusZona.length === 2 && !sel ? (
@@ -419,29 +445,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
         })}
       </svg>
 
-      {/* BARRA INFERIOR DE CULTIUS (MÒBIL) */}
-      {modeMovil && Object.keys(llegenda).length > 0 && (
-        <div style={{
-          display:'flex', 
-          flexWrap:'wrap', 
-          gap:'10px', 
-          background:'#ffffff', 
-          padding:'12px 16px', 
-          borderTop:'1px solid #e8e8e8', 
-          justifyContent:'center',
-          flexShrink:0,
-          boxShadow: '0 -3px 10px rgba(0,0,0,0.06)'
-        }}>
-          {Object.entries(llegenda).map(([nom, color]) => (
-            <div key={nom} style={{display:'flex', alignItems:'center', gap:'6px', fontSize:'12px', color:'#333', fontWeight:'500'}}>
-              <div style={{width:'12px', height:'12px', borderRadius:'3px', background:color, border:'1px solid rgba(0,0,0,0.15)'}}/>
-              {nom}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* TOOLTIP EMERGENT (ORDINADOR) */}
+      {/* TOOLTIP EMERGENT (NOMÉS ORDINADOR) */}
       {tooltip && !modeMovil && (
         <div style={{
           position:'fixed', left: tooltip.x+14, top: tooltip.y-10,
