@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 
-// Funció matemàtica de precisió per detectar si un punt està dins d'una zona
+// ✅ Funció matemàtica per detectar si un punt està dins d'una zona
 function ptInPoly(x, y, pts) {
   let inside = false
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
@@ -17,15 +17,15 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   const svgRef = useRef(null)
   const [tooltip, setTooltip] = useState(null)
   
-  // --- CÀLCULS INICIALS DE LES ZONES ---
+  // ✅ CÀLCULS INICIALS MEMOITZATS
   function getPts(zona) {
-    if (zona.forma_geojson?.points) return zona.forma_geojson.points
-    return []
+    if (!zona?.forma_geojson?.points) return []
+    return zona.forma_geojson.points
   }
 
   function calcularBbox() {
     const tots = []
-    if (camp.zones_geojson?.points) tots.push(...camp.zones_geojson.points)
+    if (camp?.zones_geojson?.points) tots.push(...camp.zones_geojson.points)
     zones.forEach(z => tots.push(...getPts(z)))
     if (!tots.length) return { minX:0, minY:0, w:1000, h:700 }
     const minX = Math.min(...tots.map(p=>p.x)) - 40
@@ -35,35 +35,32 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     return { minX, minY, w: maxX-minX, h: maxY-minY }
   }
 
-  const bbox = calcularBbox()
-  const inicialVb = `${bbox.minX} ${bbox.minY} ${bbox.w} ${bbox.h}`
+  const bbox = useMemo(() => calcularBbox(), [camp, zones])
+  const inicialVb = useMemo(() => `${bbox.minX} ${bbox.minY} ${bbox.w} ${bbox.h}`, [bbox])
   
-  // --- GESTIÓ ULTRA-PRECISA DE COORDENADES, ZOOM I MOVIMENT ---
+  // ✅ GESTIÓ PRECISA DE COORDENADES
   const [viewBox, setViewBox] = useState(inicialVb)
   const vbRef = useRef(inicialVb)
   const draggingRef = useRef(false)
   const startPosRef = useRef(null)
   const lastPosRef = useRef(null)
-
   const touchStartPos = useRef(null)
   const lastTouch = useRef(null)
   const lastDist = useRef(null)
   const isTap = useRef(false)
-  
-  // Escut de seguretat contra clics fantasma dels mòbils
   const darrerTacteTemps = useRef(0)
 
-  // Transforma els píxels de la pantalla a coordenades exactes del mapa SVG
   function getSVGCoordinates(clientX, clientY) {
     const svg = svgRef.current
     if (!svg) return null
-    const pt = svg.createSVGPoint()
-    pt.x = clientX
-    pt.y = clientY
     try {
+      const pt = svg.createSVGPoint()
+      pt.x = clientX
+      pt.y = clientY
       const svgP = pt.matrixTransform(svg.getScreenCTM().inverse())
       return { x: svgP.x, y: svgP.y }
     } catch (e) {
+      console.warn('Error calculant coordenades SVG:', e)
       return null
     }
   }
@@ -73,27 +70,28 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   }
 
   function centroid(pts) {
+    if (!pts?.length) return { x: 0, y: 0 }
     return { x: pts.reduce((s,p)=>s+p.x,0)/pts.length, y: pts.reduce((s,p)=>s+p.y,0)/pts.length }
   }
 
   function colorZona(zona, cultiusZona, sel) {
-    if (sel) return '#B5D4F4' // Color blau cel de selecció activa
-    if (!cultiusZona || cultiusZona.length === 0) return zona.color || '#e8e4de'
+    if (sel) return '#B5D4F4'
+    if (!cultiusZona?.length) return zona?.color || '#e8e4de'
     return cultiusZona[0].color || '#C0DD97'
   }
 
   function cultiusUnics() {
     const vistos = {}
-    Object.values(cultiusActius).forEach(arr => {
+    Object.values(cultiusActius || {}).forEach(arr => {
       const llista = arr?.tots || (Array.isArray(arr) ? arr : [])
-      llista.forEach(c => { if (c.nom && !vistos[c.nom]) vistos[c.nom] = c.color })
+      llista.forEach(c => { if (c?.nom && !vistos[c.nom]) vistos[c.nom] = c.color })
     })
     return vistos
   }
 
-  const llegenda = cultiusUnics()
+  const llegenda = useMemo(() => cultiusUnics(), [cultiusActius])
 
-  // Zoom amb la roda del ratolí (Ordinador)
+  // ✅ ZOOM AMB RODA DEL RATOLÍ
   function handleWheel(e) {
     e.preventDefault()
     const svg = svgRef.current
@@ -116,20 +114,18 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     setViewBox(nouVb)
   }
 
-  // Inici de clic o arrossegament (Ordinador)
+  // ✅ INICI CLIC O ARROSSEGAMENT
   function handleMouseDown(e) {
     if (e.button !== 0) return
-    // Si s'ha tocat la pantalla fa menys de 800ms, ignora el ratolí (evita el clic fantasma)
     if (Date.now() - darrerTacteTemps.current < 800) return
-
     startPosRef.current = { x: e.clientX, y: e.clientY }
     lastPosRef.current = { x: e.clientX, y: e.clientY }
     draggingRef.current = false
   }
 
-  // Moviment del ratolí (Ordinador)
+  // ✅ MOVIMENT DEL RATOLÍ
   function handleMouseMove(e) {
-    if (!lastPosRef.current) return
+    if (!lastPosRef.current || !startPosRef.current) return
     
     const dxTotal = e.clientX - startPosRef.current.x
     const dyTotal = e.clientY - startPosRef.current.y
@@ -143,7 +139,6 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
       const svg = svgRef.current
       if (!svg) return
       const rect = svg.getBoundingClientRect()
-      
       const [,, vbW, vbH] = vbRef.current.split(' ').map(Number)
       const parts = vbRef.current.split(' ').map(Number)
       
@@ -153,12 +148,11 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
       const nouVb = `${parts[0]+dx} ${parts[1]+dy} ${parts[2]} ${parts[3]}`
       vbRef.current = nouVb
       setViewBox(nouVb)
-      
       lastPosRef.current = { x: e.clientX, y: e.clientY }
     }
   }
 
-  // Final del clic (Ordinador)
+  // ✅ FINAL DEL CLIC
   function handleMouseUp(e) { 
     if (Date.now() - darrerTacteTemps.current < 800) {
       draggingRef.current = false
@@ -190,9 +184,9 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     if (svgRef.current) svgRef.current.style.cursor = 'grab'
   }
 
-  // Gestió de moviments tàctils (Mòbil)
+  // ✅ GESTIÓ DE MOVIMENTS TÀCTILS
   function handleTouchStart(e) {
-    darrerTacteTemps.current = Date.now() // Registrem que s'està usant el dit
+    darrerTacteTemps.current = Date.now()
     
     if (e.touches.length === 1) {
       touchStartPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
@@ -219,11 +213,8 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
 
     if (e.touches.length === 1 && lastTouch.current && !lastDist.current) {
       const touch = e.touches[0]
-      
       const distAssegurada = Math.hypot(touch.clientX - touchStartPos.current.x, touch.clientY - touchStartPos.current.y)
-      if (distAssegurada > 15) {
-        isTap.current = false
-      }
+      if (distAssegurada > 15) isTap.current = false
       
       const dx = touch.clientX - lastTouch.current.x
       const dy = touch.clientY - lastTouch.current.y
@@ -262,25 +253,24 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     darrerTacteTemps.current = Date.now()
     
     if (isTap.current && touchStartPos.current) {
-      const touch = e.changedTouches[0]
-      const distFinal = Math.hypot(touch.clientX - touchStartPos.current.x, touch.clientY - touchStartPos.current.y)
-      
-      if (distFinal < 20) {
-        const coords = getSVGCoordinates(touch.clientX, touch.clientY)
-        if (coords) {
-          // Busquem la zona clicada
-          for (const zona of [...zones].sort((a,b) => (b.ordre||0)-(a.ordre||0))) {
-            const pts = getPts(zona)
-            if (pts.length && ptInPoly(coords.x, coords.y, pts)) {
-              onToggleZona(zona)
-              break // Atura el bucle immediatament en trobar la zona correcta
+      const touch = e.changedTouches?.[0]
+      if (touch) {
+        const distFinal = Math.hypot(touch.clientX - touchStartPos.current.x, touch.clientY - touchStartPos.current.y)
+        if (distFinal < 20) {
+          const coords = getSVGCoordinates(touch.clientX, touch.clientY)
+          if (coords) {
+            for (const zona of [...zones].sort((a,b) => (b.ordre||0)-(a.ordre||0))) {
+              const pts = getPts(zona)
+              if (pts.length && ptInPoly(coords.x, coords.y, pts)) {
+                onToggleZona(zona)
+                break
+              }
             }
           }
         }
       }
     }
     
-    // Resetejar controls tàctils de forma neta
     lastTouch.current = null
     lastDist.current = null
     touchStartPos.current = null
@@ -288,6 +278,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   }
 
   function getTouchDist(touches) {
+    if (!touches?.[0] || !touches?.[1]) return 0
     const dx = touches[0].clientX - touches[1].clientX
     const dy = touches[0].clientY - touches[1].clientY
     return Math.sqrt(dx*dx + dy*dy)
@@ -296,6 +287,16 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   function resetZoom() {
     vbRef.current = inicialVb
     setViewBox(inicialVb)
+  }
+
+  function handleCanviaData(e) {
+    const val = e?.target?.value
+    if (typeof val !== 'string') return
+    if (val && val.length === 10 && typeof onCanviaData === 'function') {
+      onCanviaData(val)
+    } else if (!val && typeof onCanviaData === 'function') {
+      onCanviaData('')
+    }
   }
 
   return (
@@ -307,11 +308,10 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
           <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
             <label style={{fontSize:'12px', color:'#888', fontWeight:'500'}}>Veure estat del:</label>
             <input type="date" value={dataConsulta || ''}
-              onChange={e => { const val=e.target.value; if(val&&val.length===10) onCanviaData&&onCanviaData(val); else if(!val) onCanviaData&&onCanviaData('') }}
-              onBlur={e => { if(e.target.value.length===10&&typeof onCanviaData==='function') onCanviaData(e.target.value) }}
+              onChange={handleCanviaData}
               style={{padding:'5px 10px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'13px'}}/>
             {dataConsulta && (
-              <button onClick={() => onCanviaData&&onCanviaData('')}
+              <button onClick={() => onCanviaData?.('')}
                 style={{padding:'5px 10px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'12px', color:'#666', background:'white', cursor:'pointer'}}>
                 Avui
               </button>
@@ -338,7 +338,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
       {modeMovil && (
         <div style={{position:'absolute', top:'8px', left:'8px', right:'8px', display:'flex', justifyContent:'space-between', zIndex:5, pointerEvents:'none'}}>
           <input type="date" value={dataConsulta || ''}
-            onChange={e => { const val=e.target.value; if(val&&val.length===10) onCanviaData&&onCanviaData(val); else if(!val) onCanviaData&&onCanviaData('') }}
+            onChange={handleCanviaData}
             style={{padding:'5px 10px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'13px', background:'rgba(255,255,255,0.95)', pointerEvents:'all'}}/>
           {viewBox !== inicialVb && (
             <button onClick={resetZoom}
@@ -349,7 +349,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
         </div>
       )}
 
-      {/* EL MAPA EN FORMAT SVG */}
+      {/* MAPA SVG */}
       <svg
         ref={svgRef}
         viewBox={viewBox}
@@ -369,7 +369,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
         onTouchEnd={handleTouchEnd}
       >
         {/* Fons del camp */}
-        {camp.zones_geojson?.points && (
+        {camp?.zones_geojson?.points && (
           <polygon
             points={ptsToString(camp.zones_geojson.points)}
             fill="#f0ede8"
@@ -381,11 +381,11 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
         {/* Zones d'arbres/cultius */}
         {[...zones].sort((a,b) => (a.ordre||0)-(b.ordre||0)).map(zona => {
           const pts = getPts(zona)
-          if (!pts.length) return null
-          const sel = zonesSeleccionades.some(z => z.id === zona.id)
-          const cultiusZona = cultiusActius[zona.id] || []
+          if (!pts?.length) return null
+          const sel = zonesSeleccionades.some(z => z?.id === zona?.id)
+          const cultiusZona = cultiusActius?.[zona.id] || []
           const c = centroid(pts)
-          const nomPos = zona.nom_posicio || c
+          const nomPos = zona?.nom_posicio || c
           const amplada = Math.max(...pts.map(p=>p.x)) - Math.min(...pts.map(p=>p.x))
           const mida = Math.min(Math.max(amplada * 0.12, 8), 40)
 
@@ -394,7 +394,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
               onMouseEnter={e => {
                 if (modeMovil) return
                 const tots = cultiusZona.tots || cultiusZona
-                setTooltip({ x: e.clientX, y: e.clientY, zona: zona.codi, cultius: tots })
+                setTooltip({ x: e.clientX, y: e.clientY, zona: zona.codi, cultius: tots || [] })
               }}
               onMouseLeave={() => setTooltip(null)}
               style={{pointerEvents:'visiblePainted'}}>
@@ -453,7 +453,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
               )}
 
               {/* Text identificador */}
-              {zona.mostrar_nom !== false && (
+              {zona?.mostrar_nom !== false && (
                 <text
                   x={nomPos.x} y={nomPos.y}
                   textAnchor="middle"
@@ -482,9 +482,9 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
           pointerEvents:'none', zIndex:1000, maxWidth:'220px', lineHeight:'1.6',
         }}>
           <div style={{fontWeight:'600', marginBottom:'4px', fontSize:'13px'}}>Zona {tooltip.zona}</div>
-          {tooltip.cultius.length === 0 ? (
+          {tooltip.cultius?.length === 0 ? (
             <div style={{color:'#aaa'}}>Sense cultiu actiu</div>
-          ) : tooltip.cultius.map((cu, i) => (
+          ) : (tooltip.cultius || []).map((cu, i) => (
             <div key={i} style={{display:'flex', alignItems:'center', gap:'6px'}}>
               <div style={{width:'8px', height:'8px', borderRadius:'2px', background:cu.color||'#ddd', flexShrink:0}}/>
               <span>{cu.nom}{cu.varietat ? ` · ${cu.varietat}` : ''}</span>

@@ -34,7 +34,16 @@ export default function App() {
   const [mostrarXat, setMostrarXat] = useState(false)
   const [mostrarGestioRegistres, setMostrarGestioRegistres] = useState(false)
   const [mostrarPlanters, setMostrarPlanters] = useState(false)
-  
+  const [esMobil, setEsMobil] = useState(window.innerWidth < 768)
+
+  // ✅ Detecció dinàmica de responsive
+  useEffect(() => {
+    const handleResize = () => {
+      setEsMobil(window.innerWidth < 768)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -57,158 +66,205 @@ export default function App() {
   }, [usuari])
 
   async function comprovaAdmin() {
-    const { data, error } = await supabase
-      .from('usuaris_autoritzats')
-      .select('es_admin')
-      .eq('email', usuari.email)
-      .single()
-    console.log('comprovaAdmin:', data, error, usuari.email)
-    setEsAdmin(data?.es_admin || false)
-  }
-  async function actualitzaMeteoRegistres() {
-    const fa7 = new Date()
-    fa7.setDate(fa7.getDate() - 7)
-    const data7 = fa7.toISOString().split('T')[0]
-
-    // Agafar registres de fa 7+ dies sense meteo actualitzada
-    const { data: registresAntics } = await supabase
-      .from('registres')
-      .select('id, data, zona_id, zones(camp_id, camps(pobles(nom)))')
-      .lte('data', data7)
-      .eq('meteo_actualitzada', false)
-      .not('pluja_prevista', 'is', null)
-      .limit(20)
-
-    if (!registresAntics?.length) return
-
-    for (const r of registresAntics) {
-      try {
-        const poblenom = r.zones?.camps?.pobles?.nom
-        const coords = {
-          'All': { lat: 41.4731, lon: 1.5189 },
-          'Begues': { lat: 41.3397, lon: 1.8731 },
-          'Estoll': { lat: 41.5578, lon: 1.4889 },
-          'Alp': { lat: 42.3718, lon: 1.8843 },
-        }[poblenom] || { lat: 41.38, lon: 2.17 }
-
-        const dataR = r.data
-        const dataFi = new Date(dataR)
-        dataFi.setDate(dataFi.getDate() + 7)
-        const dataFiS = dataFi.toISOString().split('T')[0]
-
-        const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&daily=precipitation_sum&timezone=Europe/Madrid&start_date=${dataR}&end_date=${dataFiS}`
-        const res = await fetch(url)
-        const json = await res.json()
-
-        if (json.daily?.precipitation_sum) {
-          const plujaReal = json.daily.precipitation_sum
-            .slice(1) // excloure el dia de la tasca
-            .reduce((s, v) => s + (v||0), 0)
-
-          await supabase.from('registres').update({
-            pluja_real: parseFloat(plujaReal.toFixed(1)),
-            meteo_actualitzada: true,
-          }).eq('id', r.id)
-        }
-      } catch(e) {
-        console.log('Error actualitzant meteo registre', r.id, e)
-      }
+    try {
+      const { data, error } = await supabase
+        .from('usuaris_autoritzats')
+        .select('es_admin')
+        .eq('email', usuari.email)
+        .single()
+      if (error && error.code !== 'PGRST116') console.error('Error comprovant admin:', error)
+      setEsAdmin(data?.es_admin || false)
+    } catch (e) {
+      console.error('Error comprovant admin:', e)
+      setEsAdmin(false)
     }
-    console.log(`Meteo actualitzada per ${registresAntics.length} registres`)
+  }
+
+  async function actualitzaMeteoRegistres() {
+    try {
+      const fa7 = new Date()
+      fa7.setDate(fa7.getDate() - 7)
+      const data7 = fa7.toISOString().split('T')[0]
+
+      const { data: registresAntics, error } = await supabase
+        .from('registres')
+        .select('id, data, zona_id, zones(camp_id, camps(pobles(nom)))')
+        .lte('data', data7)
+        .eq('meteo_actualitzada', false)
+        .not('pluja_prevista', 'is', null)
+        .limit(20)
+
+      if (error) {
+        console.error('Error carregant registres antics:', error)
+        return
+      }
+
+      if (!registresAntics?.length) return
+
+      for (const r of registresAntics) {
+        try {
+          const poblenom = r.zones?.camps?.pobles?.nom
+          const coords = {
+            'All': { lat: 41.4731, lon: 1.5189 },
+            'Begues': { lat: 41.3397, lon: 1.8731 },
+            'Estoll': { lat: 41.5578, lon: 1.4889 },
+            'Alp': { lat: 42.3718, lon: 1.8843 },
+          }[poblenom] || { lat: 41.38, lon: 2.17 }
+
+          const dataR = r.data
+          const dataFi = new Date(dataR)
+          dataFi.setDate(dataFi.getDate() + 7)
+          const dataFiS = dataFi.toISOString().split('T')[0]
+
+          const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.lat}&longitude=${coords.lon}&daily=precipitation_sum&timezone=Europe/Madrid&start_date=${dataR}&end_date=${dataFiS}`
+          const res = await fetch(url)
+          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`)
+          const json = await res.json()
+
+          if (json.daily?.precipitation_sum) {
+            const plujaReal = json.daily.precipitation_sum
+              .slice(1)
+              .reduce((s, v) => s + (v||0), 0)
+
+            await supabase.from('registres').update({
+              pluja_real: parseFloat(plujaReal.toFixed(1)),
+              meteo_actualitzada: true,
+            }).eq('id', r.id)
+          }
+        } catch(e) {
+          console.warn('Error actualitzant meteo registre', r.id, e.message)
+        }
+      }
+      console.log(`Meteo actualitzada per ${registresAntics.length} registres`)
+    } catch (e) {
+      console.error('Error en actualitzaMeteoRegistres:', e)
+    }
   }
 
   async function carregaPobles() {
-    const { data: poblesData } = await supabase.from('pobles').select('*').order('nom')
-    setPobles(poblesData || [])
-    const { data: campsData } = await supabase.from('camps').select('*').order('nom')
-    setCamps(campsData || [])
+    try {
+      const { data: poblesData, error: errP } = await supabase.from('pobles').select('*').order('nom')
+      const { data: campsData, error: errC } = await supabase.from('camps').select('*').order('nom')
+      if (errP || errC) throw new Error('Error carregant pobles o camps')
+      setPobles(poblesData || [])
+      setCamps(campsData || [])
+    } catch (e) {
+      console.error('Error carregant pobles:', e)
+      setPobles([])
+      setCamps([])
+    }
   }
 
   async function seleccionaPoble(poble) {
+    if (!poble?.id) return
     setPobleSeleccionat(poble)
     setCampSeleccionat(null)
     setZones([])
     setZonesSeleccionades([])
-    const { data } = await supabase
-      .from('camps').select('*').eq('poble_id', poble.id).order('nom')
-    setCamps(data || [])
+    try {
+      const { data, error } = await supabase
+        .from('camps').select('*').eq('poble_id', poble.id).order('nom')
+      if (error) throw error
+      setCamps(data || [])
+    } catch (e) {
+      console.error('Error seleccionant poble:', e)
+      setCamps([])
+    }
   }
 
   async function seleccionaCamp(camp) {
+    if (!camp?.id) return
     setZonesSeleccionades([])
-    const { data: campData } = await supabase
-      .from('camps').select('*').eq('id', camp.id).single()
-    setCampSeleccionat(campData || camp)
-    const { data } = await supabase
-      .from('zones').select('*').eq('camp_id', camp.id).order('codi')
-    setZones(data || [])
-    carregaCultiusActius(data || [], dataConsulta || null)
+    try {
+      const { data: campData, error: errCamp } = await supabase
+        .from('camps').select('*').eq('id', camp.id).single()
+      if (errCamp) throw errCamp
+      setCampSeleccionat(campData || camp)
+      
+      const { data: zonesData, error: errZones } = await supabase
+        .from('zones').select('*').eq('camp_id', camp.id).order('codi')
+      if (errZones) throw errZones
+      setZones(zonesData || [])
+      await carregaCultiusActius(zonesData || [], dataConsulta || null)
+    } catch (e) {
+      console.error('Error seleccionant camp:', e)
+      setCampSeleccionat(null)
+      setZones([])
+    }
   }
 
   async function carregaCultiusActius(zones, dataFiltrar = null) {
-    const zonaIds = zones.map(z => z.id)
-    if (!zonaIds.length) return
-    let query = supabase
-      .from('registres')
-      .select('zona_id, data, cultius(nom, color), varietats(nom), tasques(nom)')
-      .in('zona_id', zonaIds)
-      .order('data', { ascending: false })
-    if (dataFiltrar) query = query.lte('data', dataFiltrar)
-    const { data } = await query
-    const cultiusPerZona = {}
-    const tasquesPlantacio = ['Plantar', 'Sembrar', 'Zona permanent']
+    try {
+      const zonaIds = zones.map(z => z?.id).filter(Boolean)
+      if (!zonaIds.length) return
+      
+      let query = supabase
+        .from('registres')
+        .select('zona_id, data, cultius(nom, color), varietats(nom), tasques(nom)')
+        .in('zona_id', zonaIds)
+        .order('data', { ascending: false })
+      
+      if (dataFiltrar) query = query.lte('data', dataFiltrar)
+      
+      const { data, error } = await query
+      if (error) throw error
+      
+      const cultiusPerZona = {}
+      const tasquesPlantacio = ['Plantar', 'Sembrar', 'Zona permanent']
 
-    zones.forEach(zona => {
-      const regsZona = (data || []).filter(r => r.zona_id === zona.id)
-      const ultimaNetejar = regsZona.filter(r => r.tasques?.nom === 'Netejar')[0]
+      zones.forEach(zona => {
+        if (!zona?.id) return
+        const regsZona = (data || []).filter(r => r.zona_id === zona.id)
+        const ultimaNetejar = regsZona.find(r => r.tasques?.nom === 'Netejar')
 
-      const plantacions = regsZona.filter(r => {
-        if (!tasquesPlantacio.includes(r.tasques?.nom)) return false
-        if (ultimaNetejar && new Date(r.data) <= new Date(ultimaNetejar.data)) return false
-        return true
-      })
+        const plantacions = regsZona.filter(r => {
+          if (!tasquesPlantacio.includes(r.tasques?.nom)) return false
+          if (ultimaNetejar && new Date(r.data) <= new Date(ultimaNetejar.data)) return false
+          return true
+        })
 
-      if (!plantacions.length) return
+        if (!plantacions.length) return
 
-      // Totes les combinacions cultiu+varietat (per tooltip i banda mòbil)
-      const totsVists = new Set()
-      const tots = []
-      plantacions.forEach(p => {
-        const nomCultiu = p.cultius?.nom
-        const nomVarietat = p.varietats?.nom
-        if (!nomCultiu) return
-        const clau = `${nomCultiu}||${nomVarietat}`
-        if (!totsVists.has(clau)) {
-          totsVists.add(clau)
-          tots.push({
-            nom: nomCultiu,
-            color: p.cultius.color,
-            varietat: nomVarietat && nomVarietat !== '-' ? nomVarietat : null,
-          })
+        const totsVists = new Set()
+        const tots = []
+        plantacions.forEach(p => {
+          const nomCultiu = p.cultius?.nom
+          const nomVarietat = p.varietats?.nom
+          if (!nomCultiu) return
+          const clau = `${nomCultiu}||${nomVarietat}`
+          if (!totsVists.has(clau)) {
+            totsVists.add(clau)
+            tots.push({
+              nom: nomCultiu,
+              color: p.cultius.color,
+              varietat: nomVarietat && nomVarietat !== '-' ? nomVarietat : null,
+            })
+          }
+        })
+
+        const cultiusVists = new Set()
+        const perColor = []
+        tots.forEach(t => {
+          if (!cultiusVists.has(t.nom)) {
+            cultiusVists.add(t.nom)
+            perColor.push(t)
+          }
+        })
+
+        if (tots.length > 0) {
+          cultiusPerZona[zona.id] = perColor
+          cultiusPerZona[zona.id].tots = tots
         }
       })
-
-      // Agrupat per cultiu (per al color del mapa)
-      const cultiusVists = new Set()
-      const perColor = []
-      tots.forEach(t => {
-        if (!cultiusVists.has(t.nom)) {
-          cultiusVists.add(t.nom)
-          perColor.push(t)
-        }
-      })
-
-      if (tots.length > 0) {
-        // perColor = per dibuixar colors al mapa
-        // tots = per mostrar al tooltip amb totes les varietats
-        cultiusPerZona[zona.id] = perColor
-        cultiusPerZona[zona.id].tots = tots
-      }
-    })
-    setCultiusActius(cultiusPerZona)
+      setCultiusActius(cultiusPerZona)
+    } catch (e) {
+      console.error('Error carregant cultius:', e)
+      setCultiusActius({})
+    }
   }
 
   function toggleZona(zona) {
+    if (!zona?.id) return
     setZonesSeleccionades(prev => {
       const jaSeleccionada = prev.find(z => z.id === zona.id)
       if (jaSeleccionada) return prev.filter(z => z.id !== zona.id)
@@ -217,7 +273,10 @@ export default function App() {
   }
 
   function seleccionaFila(fila) {
-    const zonesFila = zones.filter(z => z.fila === fila && !z.es_permanent)
+    if (!fila) return
+    const zonesFila = zones.filter(z => z?.fila === fila && !z.es_permanent)
+    if (!zonesFila.length) return
+    
     setZonesSeleccionades(prev => {
       const jaHiSon = zonesFila.every(z => prev.find(p => p.id === z.id))
       if (jaHiSon) return prev.filter(z => z.fila !== fila)
@@ -245,11 +304,21 @@ export default function App() {
   }
 
   async function tancarSessio() {
-    await supabase.auth.signOut()
-    setPobleSeleccionat(null)
-    setCampSeleccionat(null)
-    setZones([])
-    setZonesSeleccionades([])
+    try {
+      await supabase.auth.signOut()
+      setPobleSeleccionat(null)
+      setCampSeleccionat(null)
+      setZones([])
+      setZonesSeleccionades([])
+    } catch (e) {
+      console.error('Error tancant sessió:', e)
+    }
+  }
+
+  async function handleCanviaData(d) {
+    if (typeof d !== 'string') return
+    setDataConsulta(d)
+    await carregaCultiusActius(zones, d || null)
   }
 
   if (carregant) return (
@@ -257,7 +326,6 @@ export default function App() {
   )
 
   if (!usuari) return <Login onLogin={setUsuari} />
-  const esMobil = window.innerWidth < 768
   
   if (esMobil) return (
     <AppMovil
@@ -270,14 +338,11 @@ export default function App() {
       pobleSeleccionat={pobleSeleccionat}
       campSeleccionat={campSeleccionat}
       zonesSeleccionades={zonesSeleccionades}
-      onSeleccionaPoble={setPobleSeleccionat}
+      onSeleccionaPoble={seleccionaPoble}
       onSeleccionaCamp={seleccionaCamp}
       onToggleZona={toggleZona}
       onSeleccionaFila={seleccionaFila}
-      onCanviaData={(d) => {
-        setDataConsulta(d)
-        carregaCultiusActius(zones, d || null)
-      }}
+      onCanviaData={handleCanviaData}
       onGuardatTasca={() => {
         setZonesSeleccionades([])
         carregaCultiusActius(zones, dataConsulta || null)
@@ -285,6 +350,7 @@ export default function App() {
       onTancarSessio={tancarSessio}
     />
   )
+
   return (
     <div style={styles.app}>
       <div style={styles.capcalera}>
@@ -297,12 +363,11 @@ export default function App() {
               : ''}
           </p>
           {esAdmin && (
-              <button onClick={() => setMostrarGestioUsuaris(true)} style={styles.botoCapcalera}>
-                👥 Usuaris
-              </button>
-            )}
+            <button onClick={() => setMostrarGestioUsuaris(true)} style={styles.botoCapcalera}>
+              👥 Usuaris
+            </button>
+          )}
           <div style={{marginLeft:'auto', display:'flex', alignItems:'center', gap:'8px'}}>
-           
             <button onClick={() => setMostrarConfig(true)} style={styles.botoCapcalera}>
               ⚙️ Config
             </button>
@@ -320,11 +385,6 @@ export default function App() {
 
       <div style={styles.contingut}>
         <div style={styles.sidebar}>
-          <div
-            style={{...styles.item, background:'#E1F5EE', color:'#0F6E56', fontWeight:'500', marginBottom:'8px', display:'flex', alignItems:'center', gap:'6px'}}
-            onClick={() => setMostrarPlanters(true)}>
-            🌱 Planters
-          </div>
           <div style={styles.seccio}>Pobles</div>
           {pobles.map(p => (
             <div key={p.id}
@@ -343,7 +403,6 @@ export default function App() {
               </div>
             ))}
           </>}
-          
         </div>
 
         <div style={styles.principal}>
@@ -353,13 +412,10 @@ export default function App() {
               zones={zones}
               zonesSeleccionades={zonesSeleccionades}
               onToggleZona={toggleZona}
-              onSeleccionaFila={seleccionaFila}
               cultiusActius={cultiusActius}
               dataConsulta={dataConsulta}
-              onCanviaData={(d) => {
-                setDataConsulta(d)
-                carregaCultiusActius(zones, d || null)
-              }}
+              onCanviaData={handleCanviaData}
+              modeMovil={esMobil}
             />
           ) : (
             <div style={styles.centrat}>
@@ -413,11 +469,11 @@ export default function App() {
                 onClick={() => setMostrarEditor(true)}>
                 ✏️ Editar zones
               </button>
-              
             </>}
           </div>
         )}
       </div>
+
       {mostrarXat && (
         <XatIA onTancar={() => setMostrarXat(false)} />
       )}
@@ -446,11 +502,9 @@ export default function App() {
           onActualitzar={() => carregaPobles()}
         />
       )}
-      
       {mostrarGestioUsuaris && (
         <GestioUsuaris onTancar={() => setMostrarGestioUsuaris(false)} />
       )}
-      
       {mostrarFormulari && (
         <FormulariTasca
           zones={zonesSeleccionades}
