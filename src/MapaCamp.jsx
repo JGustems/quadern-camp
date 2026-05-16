@@ -1,5 +1,18 @@
 import { useState, useRef } from 'react'
 
+// Funció matemàtica de seguretat (Ray-casting) per detectar clics dins dels polígons al mòbil
+function ptInPoly(x, y, pts) {
+  let inside = false
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i].x, yi = pts[i].y
+    const xj = pts[j].x, yj = pts[j].y
+    const intersect = ((yi > y) !== (yj > y))
+        && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)
+    if (intersect) inside = !inside
+  }
+  return inside
+}
+
 export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona, cultiusActius, dataConsulta, onCanviaData, modeMovil }) {
   const svgRef = useRef(null)
   const [tooltip, setTooltip] = useState(null)
@@ -25,11 +38,13 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
   const bbox = calcularBbox()
   const inicialVb = `${bbox.minX} ${bbox.minY} ${bbox.w} ${bbox.h}`
   
-  // --- GESTIÓ ULTRA-RÀPIDA DEL ZOOM I PAN (SENSE APAGADES REAC) ---
+  // --- GESTIÓ DEL ZOOM I MOVIMENT ---
   const [viewBox, setViewBox] = useState(inicialVb)
   const vbRef = useRef(inicialVb)
   const draggingRef = useRef(false)
+  const startPosRef = useRef(null)
   const lastPosRef = useRef(null)
+  const isClickRef = useRef(true)
 
   const lastTouch = useRef(null)
   const lastDist = useRef(null)
@@ -62,7 +77,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
 
   const llegenda = cultiusUnics()
 
-  // Zoom amb la roda del ratolí
+  // Zoom de la roda del ratolí
   function handleWheel(e) {
     e.preventDefault()
     const svg = svgRef.current
@@ -85,16 +100,30 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
     setViewBox(nouVb)
   }
 
-  // Arrossegament i moviment de pantalla (Ordinador)
+  // Inici de clic/arrossegament (Ordinador)
   function handleMouseDown(e) {
     if (e.button !== 0) return
-    draggingRef.current = true
+    startPosRef.current = { x: e.clientX, y: e.clientY }
     lastPosRef.current = { x: e.clientX, y: e.clientY }
-    if (svgRef.current) svgRef.current.style.cursor = 'grabbing'
+    draggingRef.current = false
+    isClickRef.current = true
   }
 
+  // Moviment del ratolí (Evita micro-moviments que trenquen el clic)
   function handleMouseMove(e) {
-    if (draggingRef.current && lastPosRef.current) {
+    if (!lastPosRef.current) return
+    
+    const dxTotal = e.clientX - startPosRef.current.x
+    const dyTotal = e.clientY - startPosRef.current.y
+    
+    // Si es mou més de 5 píxels, llavors SÍ que és un arrossegament i no un clic
+    if (isClickRef.current && Math.hypot(dxTotal, dyTotal) > 5) {
+      isClickRef.current = false
+      draggingRef.current = true
+      if (svgRef.current) svgRef.current.style.cursor = 'grabbing'
+    }
+
+    if (draggingRef.current) {
       const svg = svgRef.current
       if (!svg) return
       const rect = svg.getBoundingClientRect()
@@ -307,7 +336,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
 
           return (
             <g key={zona.id}
-              onClick={modeMovil ? undefined : () => onToggleZona(zona)}
+              onClick={() => onToggleZona(zona)}
               onMouseEnter={e => {
                 if (modeMovil) return
                 const tots = cultiusZona.tots || cultiusZona
@@ -390,7 +419,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
         })}
       </svg>
 
-      {/* BARRA INFERIOR DE CULTIUS (NOMÉS MÒBIL) */}
+      {/* BARRA INFERIOR DE CULTIUS (MÒBIL) */}
       {modeMovil && Object.keys(llegenda).length > 0 && (
         <div style={{
           display:'flex', 
@@ -412,7 +441,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
         </div>
       )}
 
-      {/* TOOLTIP EMERGENT (NOMÉS ORDINADOR) */}
+      {/* TOOLTIP EMERGENT (ORDINADOR) */}
       {tooltip && !modeMovil && (
         <div style={{
           position:'fixed', left: tooltip.x+14, top: tooltip.y-10,
