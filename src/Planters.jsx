@@ -347,12 +347,9 @@ export default function Planters({ onTancar }) {
                   value={cellaNotes} onChange={e => setCellaNotes(e.target.value)}/>
               </div>
 
-              <div style={{display:'flex', gap:'8px'}}>
+             <div style={{marginTop:'auto', paddingTop:'12px', display:'flex', flexDirection:'column', gap:'6px'}}>
                 <button style={styles.botoPrimari} onClick={guardarCella} disabled={guardant}>
-                  {guardant ? '...' : 'Guardar'}
-                </button>
-                <button style={styles.botoCancel} onClick={() => setCellaSeleccionada(null)}>
-                  Cancel·lar
+                  {guardant ? 'Guardant...' : '💾 Guardar'}
                 </button>
                 <button style={styles.botoCancel} onClick={() => { setCellaSeleccionada(null); setCellesSeleccionades([]) }}>
                   Cancel·lar
@@ -387,8 +384,15 @@ export default function Planters({ onTancar }) {
               </div>
               <div style={styles.grup}>
                 <label style={styles.label}>Ubicació</label>
-                <input style={styles.input} value={nouUbicacio}
-                  onChange={e => setNouUbicacio(e.target.value)}/>
+                <select style={styles.input} value={nouUbicacio}
+                  onChange={e => setNouUbicacio(e.target.value)}>
+                  <option value="Casa">Casa</option>
+                  <option value="All">All</option>
+                  <option value="Begues">Begues</option>
+                  <option value="Estoll">Estoll</option>
+                  <option value="Alp">Alp</option>
+                  <option value="Altre">Altre</option>
+                </select>
               </div>
               <div style={{background:'#f0f9f5', border:'1px solid #b5e0d0', borderRadius:'8px', padding:'10px', fontSize:'12px', color:'#555', marginBottom:'12px'}}>
                 Es crearà una graella de {nouFiles}×{nouColumnes} = {nouFiles*nouColumnes} cel·les
@@ -434,7 +438,7 @@ const styles = {
   llegenda: { display:'flex', gap:'16px', padding:'8px 16px', borderTop:'1px solid #eee', flexShrink:0 },
   llegendaItem: { display:'flex', alignItems:'center', gap:'6px', fontSize:'12px', color:'#666' },
   llegendaDot: { width:'14px', height:'14px', borderRadius:'3px' },
-  panell: { width:'220px', borderLeft:'1px solid #eee', padding:'14px', overflowY:'auto', flexShrink:0 },
+  panell: { width:'220px', borderLeft:'1px solid #eee', padding:'14px', overflowY:'auto', flexShrink:0, display:'flex', flexDirection:'column' },
   panellTitol: { fontSize:'14px', fontWeight:'600', color:'#333', marginBottom:'12px' },
   centrat: { display:'flex', alignItems:'center', justifyContent:'center', height:'100%' },
   grup: { marginBottom:'10px' },
