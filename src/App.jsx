@@ -12,6 +12,7 @@ import GestioUsuaris from './GestioUsuaris.jsx'
 import XatIA from './XatIA.jsx'
 import GestioRegistres from './GestioRegistres.jsx'
 import Planters from './Planters.jsx'
+import InformeCicles from './InformeCicles.jsx'
 
 export default function App() {
   const [usuari, setUsuari] = useState(null)
@@ -35,6 +36,7 @@ export default function App() {
   const [mostrarGestioRegistres, setMostrarGestioRegistres] = useState(false)
   const [mostrarPlanters, setMostrarPlanters] = useState(false)
   const [esMobil, setEsMobil] = useState(window.innerWidth < 768)
+  const [mostrarInformeCicles, setMostrarInformeCicles] = useState(false)
 
   // ✅ Detecció dinàmica de responsive
   useEffect(() => {
@@ -371,11 +373,11 @@ export default function App() {
             <button onClick={() => setMostrarConfig(true)} style={styles.botoCapcalera}>
               ⚙️ Config
             </button>
-            <button onClick={() => setMostrarPlanters(true)} style={styles.botoCapcalera}>
-              🌱 Planters
-            </button>
             <button onClick={() => setMostrarGestioRegistres(true)} style={styles.botoCapcalera}>
               📋 Registres
+            </button>
+            <button onClick={() => setMostrarInformeCicles(true)} style={styles.botoCapcalera}>
+              📊 Cicles
             </button>
             <span style={{fontSize:'12px', opacity:0.8}}>{usuari.email}</span>
             <button onClick={tancarSessio} style={styles.botoSortir}>Sortir</button>
@@ -506,6 +508,9 @@ export default function App() {
           onTancar={() => setMostrarGestioCamps(false)}
           onActualitzar={() => carregaPobles()}
         />
+      )}
+      {mostrarInformeCicles && (
+        <InformeCicles onTancar={() => setMostrarInformeCicles(false)} />
       )}
       {mostrarGestioUsuaris && (
         <GestioUsuaris onTancar={() => setMostrarGestioUsuaris(false)} />
