@@ -12,7 +12,7 @@ export default function GestioRegistres({ onTancar }) {
   const [carregant, setCarregant] = useState(true)
   const [editant, setEditant] = useState(null)
   const [guardant, setGuardant] = useState(false)
-  const [filtre, setFiltre] = useState({ camp: '', data: '', tasca: '' })
+  const [filtre, setFiltre] = useState({ camp: '', data: '', tasca: '', cultiu: '' })
   const [pagina, setPagina] = useState(0)
   const PER_PAGINA = 20
 
@@ -111,6 +111,7 @@ export default function GestioRegistres({ onTancar }) {
     if (filtre.camp && r.zones?.camps?.nom !== filtre.camp) return false
     if (filtre.tasca && r.tasques?.nom !== filtre.tasca) return false
     if (filtre.data && !r.data?.startsWith(filtre.data)) return false
+    if (filtre.cultiu && r.cultius?.nom !== filtre.cultiu) return false
     return true
   })
 
@@ -136,6 +137,11 @@ export default function GestioRegistres({ onTancar }) {
             onChange={e => { setFiltre(f=>({...f,tasca:e.target.value})); setPagina(0) }}>
             <option value="">Totes les tasques</option>
             {tasques.map(t => <option key={t.id} value={t.nom}>{t.nom}</option>)}
+          </select>
+          <select style={styles.filtre} value={filtre.cultiu}
+            onChange={e => { setFiltre(f=>({...f,cultiu:e.target.value})); setPagina(0) }}>
+            <option value="">Tots els cultius</option>
+            {cultius.map(c => <option key={c.id} value={c.nom}>{c.nom}</option>)}
           </select>
           <input type="month" style={styles.filtre} value={filtre.data}
             onChange={e => { setFiltre(f=>({...f,data:e.target.value})); setPagina(0) }}/>
