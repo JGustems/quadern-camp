@@ -32,72 +32,94 @@ export default function InformeCicles({ onTancar }) {
     if (!cultiuSeleccionat) return
     setCarregant(true)
 
-    // Agafar tots els registres del cultiu seleccionat
-    let query = supabase
+    // 1. Agafar totes les plantacions del cultiu
+    let queryPlantacions = supabase
       .from('registres')
       .select(`
-        id, data, quantitat, unitat, notes, lluna, temp_max, temp_min, codi_temps, pluja_setmana, pluja_real,
-        tasques(nom), zones(codi, camp_id, camps(nom, pobles(nom))), varietats(nom)
+        id, data, notes, lluna, temp_max, temp_min, codi_temps, pluja_setmana,
+        tasques(nom), zones(id, codi, camp_id, camps(nom, pobles(nom))), varietats(id, nom)
       `)
       .eq('cultiu_id', cultiuSeleccionat.id)
+      .in('tasques.nom', ['Plantar', 'Sembrar', 'Zona permanent'])
       .order('data', { ascending: true })
 
     if (varietatSeleccionada) {
-      query = query.eq('varietat_id', varietatSeleccionada.id)
+      queryPlantacions = queryPlantacions.eq('varietat_id', varietatSeleccionada.id)
     }
 
-    const { data: registres } = await query
-    if (!registres) { setCicles([]); setCarregant(false); return }
+    const { data: plantacions } = await queryPlantacions
 
-    // Agrupar per zona
-    const perZona = {}
-    registres.forEach(r => {
-      const zonaKey = `${r.zones?.camps?.pobles?.nom} · ${r.zones?.camps?.nom} · Zona ${r.zones?.codi}`
-      if (!perZona[zonaKey]) perZona[zonaKey] = []
-      perZona[zonaKey].push(r)
+    if (!plantacions?.length) { setCicles([]); setCarregant(false); return }
+
+    // 2. Agafar totes les zones implicades
+    const zonaIds = [...new Set(plantacions.map(p => p.zona_id || p.zones?.id).filter(Boolean))]
+
+    // 3. Agafar tots els registres posteriors per aquelles zones
+    const { data: registresZones } = await supabase
+      .from('registres')
+      .select(`
+        id, zona_id, data, quantitat, unitat, notes, lluna, temp_max, temp_min, codi_temps, pluja_setmana, pluja_real,
+        tasques(nom), cultius(nom), varietats(nom)
+      `)
+      .in('zona_id', zonaIds)
+      .order('data', { ascending: true })
+
+    // 4. Agrupar plantacions per data + varietat (mateix dia = mateix cicle)
+    const ciclesMap = {}
+    plantacions.forEach(p => {
+      const varNom = p.varietats?.nom || '-'
+      const clau = `${p.data}||${varNom}`
+      if (!ciclesMap[clau]) {
+        ciclesMap[clau] = {
+          dataInici: p.data,
+          varietat: varNom,
+          varietatId: p.varietats?.id,
+          zones: [],
+          sembra: p,
+          collites: [],
+          dataFi: null,
+          estat: 'actiu',
+          notes: p.notes ? [{ data: p.data, tasca: 'Sembra', text: p.notes }] : [],
+        }
+      }
+      const zonaInfo = `${p.zones?.camps?.pobles?.nom} · ${p.zones?.camps?.nom} · Z${p.zones?.codi}`
+      if (!ciclesMap[clau].zones.includes(zonaInfo)) {
+        ciclesMap[clau].zones.push(zonaInfo)
+      }
+      // Guardar zona_id per buscar registres posteriors
+      if (!ciclesMap[clau].zonaIds) ciclesMap[clau].zonaIds = []
+      const zonaId = p.zona_id || p.zones?.id
+      if (zonaId && !ciclesMap[clau].zonaIds.includes(zonaId)) {
+        ciclesMap[clau].zonaIds.push(zonaId)
+      }
     })
 
-    // Construir cicles per cada zona
-    const totsCicles = []
-    Object.entries(perZona).forEach(([zonaKey, regs]) => {
-      const tasquesInici = ['Plantar', 'Sembrar', 'Zona permanent']
-      let cicleActual = null
+    // 5. Per cada cicle, buscar collites i neteja posteriors
+    const ciclesFinals = Object.values(ciclesMap).map(cicle => {
+      const regsDelCicle = (registresZones || []).filter(r => {
+        if (!cicle.zonaIds?.includes(r.zona_id)) return false
+        if (r.data < cicle.dataInici) return false
+        return true
+      })
 
-      regs.forEach(r => {
+      regsDelCicle.forEach(r => {
         const tasca = r.tasques?.nom
-
-        if (tasquesInici.includes(tasca)) {
-          // Nou cicle
-          if (cicleActual) totsCicles.push({ ...cicleActual, zona: zonaKey })
-          cicleActual = {
-            dataInici: r.data,
-            dataFi: null,
-            estat: 'actiu',
-            sembra: r,
-            collites: [],
-            netejar: null,
-            notes: r.notes ? [{ data: r.data, text: r.notes }] : [],
-          }
-        } else if (tasca === 'Collir' && cicleActual) {
-          cicleActual.collites.push(r)
-          if (r.notes) cicleActual.notes.push({ data: r.data, text: r.notes })
-        } else if (tasca === 'Netejar' && cicleActual) {
-          cicleActual.dataFi = r.data
-          cicleActual.estat = 'tancat'
-          cicleActual.netejar = r
-          totsCicles.push({ ...cicleActual, zona: zonaKey })
-          cicleActual = null
-        } else if (cicleActual && r.notes) {
-          cicleActual.notes.push({ data: r.data, tasca, text: r.notes })
+        if (tasca === 'Collir') {
+          cicle.collites.push(r)
+          if (r.notes) cicle.notes.push({ data: r.data, tasca: 'Collir', text: r.notes })
+        } else if (tasca === 'Netejar' && cicle.estat === 'actiu') {
+          cicle.dataFi = r.data
+          cicle.estat = 'tancat'
+        } else if (r.notes && !['Plantar','Sembrar','Zona permanent'].includes(tasca)) {
+          cicle.notes.push({ data: r.data, tasca, text: r.notes })
         }
       })
 
-      if (cicleActual) totsCicles.push({ ...cicleActual, zona: zonaKey })
+      return cicle
     })
 
-    // Ordenar per data d'inici desc
-    totsCicles.sort((a,b) => new Date(b.dataInici) - new Date(a.dataInici))
-    setCicles(totsCicles)
+    ciclesFinals.sort((a,b) => new Date(b.dataInici) - new Date(a.dataInici))
+    setCicles(ciclesFinals)
     setCarregant(false)
   }
 
@@ -112,15 +134,9 @@ export default function InformeCicles({ onTancar }) {
   }
 
   function totalCollita(cicle) {
-    const total = cicle.collites.reduce((s, r) => s + (r.quantitat || 0), 0)
+    const total = cicle.collites.reduce((s, r) => s + (parseFloat(r.quantitat) || 0), 0)
     const unitat = cicle.collites[0]?.unitat || 'kg'
     return total > 0 ? `${total.toFixed(1)} ${unitat}` : null
-  }
-
-  function plujaAcumulada(cicle) {
-    const vals = cicle.collites.map(r => r.pluja_real || 0).filter(v => v > 0)
-    if (!vals.length) return null
-    return vals.reduce((s,v) => s+v, 0).toFixed(1)
   }
 
   return (
@@ -131,12 +147,12 @@ export default function InformeCicles({ onTancar }) {
           <button style={styles.botoTancar} onClick={onTancar}>✕</button>
         </div>
 
-        {/* Filtres */}
         <div style={styles.filtres}>
           <select style={styles.select} value={cultiuSeleccionat?.id || ''}
             onChange={e => {
               const c = cultius.find(c => c.id === parseInt(e.target.value))
               setCultiuSeleccionat(c || null)
+              setCicles([])
             }}>
             <option value="">Selecciona un cultiu</option>
             {cultius.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
@@ -156,7 +172,7 @@ export default function InformeCicles({ onTancar }) {
           {cicles.length > 0 && (
             <span style={styles.resum}>
               {cicles.length} cicle{cicles.length !== 1 ? 's' : ''} ·
-              {cicles.filter(c => c.estat === 'actiu').length} actiu{cicles.filter(c => c.estat === 'actiu').length !== 1 ? 's' : ''}
+              {' '}{cicles.filter(c => c.estat === 'actiu').length} actiu{cicles.filter(c => c.estat === 'actiu').length !== 1 ? 's' : ''}
             </span>
           )}
         </div>
@@ -178,27 +194,36 @@ export default function InformeCicles({ onTancar }) {
           )}
 
           {!carregant && cicles.map((cicle, idx) => {
-            const dies = diesEntreDates(cicle.dataInici, cicle.dataFi || new Date().toISOString().split('T')[0])
+            const avui = new Date().toISOString().split('T')[0]
+            const dataFiCalc = cicle.dataFi || (cicle.collites.length > 0 ? cicle.collites[cicle.collites.length-1].data : null)
+            const dies = diesEntreDates(cicle.dataInici, dataFiCalc || avui)
             const totalQ = totalCollita(cicle)
-            const pluja = plujaAcumulada(cicle)
             const esExpandit = expandit === idx
 
             return (
               <div key={idx} style={styles.cicle}>
-                {/* Capçalera del cicle */}
                 <div style={styles.cicleHeader} onClick={() => setExpandit(esExpandit ? null : idx)}>
                   <div style={{flex:1}}>
-                    <div style={styles.cicleZona}>{cicle.zona}</div>
+                    <div style={styles.cicleZones}>
+                      {cicle.zones.join(' · ')}
+                    </div>
+                    {cicle.varietat && cicle.varietat !== '-' && (
+                      <div style={styles.cicleVarietat}>Varietat: {cicle.varietat}</div>
+                    )}
                     <div style={styles.cicleDates}>
-                      📅 {formatData(cicle.dataInici)} → {cicle.estat === 'actiu' ? <span style={{color:'#1D9E75', fontWeight:'500'}}>Actiu</span> : formatData(cicle.dataFi)}
+                      📅 {formatData(cicle.dataInici)}
+                      {' → '}
+                      {cicle.estat === 'actiu'
+                        ? <span style={{color:'#1D9E75', fontWeight:'500'}}>Actiu</span>
+                        : formatData(cicle.dataFi)
+                      }
                       {dies && <span style={styles.cicleDies}> · {dies} dies</span>}
                     </div>
                     <div style={styles.cicleResum}>
-                      {cicle.collites.length > 0 && <span>🧺 {cicle.collites.length} collita{cicle.collites.length !== 1 ? 'es' : ''}</span>}
-                      {totalQ && <span> · {totalQ}</span>}
-                      {cicle.sembra?.varietats?.nom && cicle.sembra.varietats.nom !== '-' && (
-                        <span style={{color:'#888'}}> · {cicle.sembra.varietats.nom}</span>
-                      )}
+                      {cicle.collites.length > 0
+                        ? <span>🧺 {cicle.collites.length} collita{cicle.collites.length !== 1 ? 'es' : ''}{totalQ ? ` · ${totalQ}` : ''}</span>
+                        : <span style={{color:'#aaa'}}>Sense collites registrades</span>
+                      }
                     </div>
                   </div>
                   <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'4px'}}>
@@ -209,18 +234,26 @@ export default function InformeCicles({ onTancar }) {
                   </div>
                 </div>
 
-                {/* Detall expandit */}
                 {esExpandit && (
                   <div style={styles.cicleDetall}>
                     {/* Sembra */}
                     <div style={styles.seccioDetall}>
                       <div style={styles.seccioTitol}>🌱 Sembra / Plantació</div>
                       <div style={styles.meteoFila}>
-                        <span>{formatData(cicle.sembra.data)}</span>
-                        {cicle.sembra.temp_max && <span>{ICONS_TEMPS[cicle.sembra.codi_temps]||'🌡️'} {cicle.sembra.temp_max}°/{cicle.sembra.temp_min}°</span>}
-                        {cicle.sembra.lluna !== null && <span>{FASES_LLUNA[cicle.sembra.lluna]}</span>}
-                        {cicle.sembra.pluja_setmana !== null && <span>🌧️ {cicle.sembra.pluja_setmana}mm setmana anterior</span>}
+                        <span style={{fontWeight:'500'}}>{formatData(cicle.sembra.data)}</span>
+                        {cicle.sembra.temp_max && (
+                          <span>{ICONS_TEMPS[cicle.sembra.codi_temps]||'🌡️'} {cicle.sembra.temp_max}°/{cicle.sembra.temp_min}°</span>
+                        )}
+                        {cicle.sembra.lluna !== null && cicle.sembra.lluna !== undefined && (
+                          <span>{FASES_LLUNA[cicle.sembra.lluna]}</span>
+                        )}
+                        {cicle.sembra.pluja_setmana !== null && (
+                          <span>🌧️ {cicle.sembra.pluja_setmana}mm setmana anterior</span>
+                        )}
                       </div>
+                      {cicle.sembra.notes && (
+                        <div style={styles.notaText}>💬 {cicle.sembra.notes}</div>
+                      )}
                     </div>
 
                     {/* Collites */}
@@ -234,46 +267,39 @@ export default function InformeCicles({ onTancar }) {
                             <div key={col.id} style={styles.collitaFila}>
                               <div style={styles.collitaData}>
                                 {formatData(col.data)}
-                                {diesDesSembra && <span style={styles.collitaDies}> +{diesDesSembra}d</span>}
-                                {diesAnterior && <span style={styles.collitaDies2}> (interval: {diesAnterior}d)</span>}
+                                {diesDesSembra && <span style={styles.cicleDies}> +{diesDesSembra}d des de sembra</span>}
+                                {diesAnterior && <span style={{color:'#aaa', fontSize:'11px'}}> (interval: {diesAnterior}d)</span>}
                               </div>
                               <div style={styles.collitaInfo}>
                                 {col.quantitat && <span style={styles.collitaQ}>{col.quantitat} {col.unitat||''}</span>}
                                 {col.temp_max && <span>{ICONS_TEMPS[col.codi_temps]||'🌡️'} {col.temp_max}°/{col.temp_min}°</span>}
-                                {col.lluna !== null && <span>{FASES_LLUNA[col.lluna]}</span>}
+                                {col.lluna !== null && col.lluna !== undefined && <span>{FASES_LLUNA[col.lluna]}</span>}
+                                {col.pluja_real && <span>🌧️ {col.pluja_real}mm setmana</span>}
                               </div>
-                              {col.notes && <div style={styles.collitaNotes}>💬 {col.notes}</div>}
+                              {col.notes && <div style={styles.notaText}>💬 {col.notes}</div>}
                             </div>
                           )
                         })}
                         {totalQ && (
                           <div style={styles.totalCollita}>
                             Total: {totalQ}
-                            {cicle.collites.length > 1 && ` · Interval mitjà: ${Math.round(dies / cicle.collites.length)} dies`}
+                            {cicle.collites.length > 1 && dies && ` · Interval mitjà: ${Math.round(dies / cicle.collites.length)}d`}
                           </div>
                         )}
                       </div>
                     )}
 
-                    {/* Notes d'altres tasques */}
-                    {cicle.notes.filter(n => n.tasca && n.tasca !== 'Collir').length > 0 && (
+                    {/* Observacions d'altres tasques */}
+                    {cicle.notes.filter(n => n.tasca !== 'Sembra' && n.tasca !== 'Collir' && n.text).length > 0 && (
                       <div style={styles.seccioDetall}>
                         <div style={styles.seccioTitol}>💬 Observacions</div>
-                        {cicle.notes.filter(n => n.tasca && n.tasca !== 'Collir').map((n, i) => (
+                        {cicle.notes.filter(n => n.tasca !== 'Sembra' && n.tasca !== 'Collir' && n.text).map((n, i) => (
                           <div key={i} style={styles.notaFila}>
                             <span style={styles.notaData}>{formatData(n.data)}</span>
                             {n.tasca && <span style={styles.notaTasca}>{n.tasca}</span>}
                             <span style={styles.notaText}>{n.text}</span>
                           </div>
                         ))}
-                      </div>
-                    )}
-
-                    {/* Resum meteo del cicle */}
-                    {pluja && (
-                      <div style={styles.seccioDetall}>
-                        <div style={styles.seccioTitol}>🌧️ Pluja durant el cicle</div>
-                        <div style={{fontSize:'13px', color:'#555'}}>{pluja} mm acumulats (de les setmanes de collita)</div>
                       </div>
                     )}
                   </div>
@@ -297,28 +323,26 @@ const styles = {
   select: { padding:'7px 10px', border:'1px solid #ddd', borderRadius:'6px', fontSize:'13px', color:'#333' },
   resum: { fontSize:'12px', color:'#888', marginLeft:'auto' },
   cos: { flex:1, overflowY:'auto', padding:'12px 16px' },
-  centrat: { display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', color:'#aaa', fontSize:'14px' },
+  centrat: { display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'200px', color:'#aaa', fontSize:'14px' },
   cicle: { border:'1px solid #eee', borderRadius:'10px', marginBottom:'10px', overflow:'hidden' },
-  cicleHeader: { padding:'12px 16px', cursor:'pointer', display:'flex', gap:'12px', alignItems:'flex-start' },
-  cicleZona: { fontSize:'13px', fontWeight:'600', color:'#333', marginBottom:'3px' },
+  cicleHeader: { padding:'12px 16px', cursor:'pointer', display:'flex', gap:'12px', alignItems:'flex-start', background:'white' },
+  cicleZones: { fontSize:'12px', color:'#888', marginBottom:'2px' },
+  cicleVarietat: { fontSize:'13px', fontWeight:'600', color:'#333', marginBottom:'3px' },
   cicleDates: { fontSize:'12px', color:'#555', marginBottom:'3px' },
-  cicleDies: { color:'#1D9E75', fontWeight:'500' },
+  cicleDies: { color:'#1D9E75', fontWeight:'600' },
   cicleResum: { fontSize:'12px', color:'#888' },
   badge: { padding:'3px 8px', borderRadius:'20px', fontSize:'11px', fontWeight:'500' },
   cicleDetall: { padding:'12px 16px', borderTop:'1px solid #f0f0f0', background:'#fafafa' },
   seccioDetall: { marginBottom:'14px' },
   seccioTitol: { fontSize:'11px', fontWeight:'600', color:'#999', textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:'8px' },
-  meteoFila: { display:'flex', gap:'12px', flexWrap:'wrap', fontSize:'13px', color:'#555' },
-  collitaFila: { padding:'6px 0', borderBottom:'0.5px solid #eee' },
+  meteoFila: { display:'flex', gap:'12px', flexWrap:'wrap', fontSize:'13px', color:'#555', marginBottom:'4px' },
+  collitaFila: { padding:'7px 0', borderBottom:'0.5px solid #eee' },
   collitaData: { fontSize:'13px', color:'#333', fontWeight:'500', marginBottom:'3px' },
-  collitaDies: { color:'#1D9E75', fontWeight:'600', fontSize:'12px' },
-  collitaDies2: { color:'#aaa', fontSize:'11px' },
   collitaInfo: { display:'flex', gap:'12px', fontSize:'12px', color:'#666', flexWrap:'wrap' },
   collitaQ: { color:'#1D9E75', fontWeight:'600' },
-  collitaNotes: { fontSize:'12px', color:'#888', marginTop:'3px', fontStyle:'italic' },
   totalCollita: { fontSize:'12px', fontWeight:'600', color:'#1D9E75', marginTop:'8px', padding:'6px 0' },
   notaFila: { display:'flex', gap:'8px', padding:'4px 0', fontSize:'12px', borderBottom:'0.5px solid #eee', flexWrap:'wrap' },
-  notaData: { color:'#aaa', minWidth:'80px' },
-  notaTasca: { color:'#888', fontStyle:'italic' },
-  notaText: { color:'#555', flex:1 },
+  notaData: { color:'#aaa', minWidth:'80px', flexShrink:0 },
+  notaTasca: { color:'#888', fontStyle:'italic', flexShrink:0 },
+  notaText: { color:'#555', fontSize:'12px', marginTop:'3px' },
 }
