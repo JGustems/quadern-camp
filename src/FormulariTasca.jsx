@@ -40,7 +40,7 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
   const [plujaSentmana, setPlujaSentmana] = useState(null)
   const [plujaPrevisio, setPlujaPrevisio] = useState(null)
   const [carregantTemps, setCarregantTemps] = useState(false)
-  const [guardant, setGuardant] = useState(false)
+  const [nt, setnt] = useState(false)
 
   const tascaSeleccionada = tasques.find(t => t.id === parseInt(tascaId))
   const mostrarCultiu = ['Plantar','Sembrar','Zona permanent'].includes(tascaSeleccionada?.nom)
@@ -50,11 +50,12 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
     const tots = new Map()
     zones.forEach(zona => {
       const ca = cultiusActius?.[zona.id]
-      if (Array.isArray(ca)) {
-        ca.forEach(c => {
-          if (!tots.has(c.nom)) tots.set(c.nom, c)
-        })
-      }
+      // Usar .tots per tenir totes les varietats
+      const llista = ca?.tots || (Array.isArray(ca) ? ca : [])
+      llista.forEach(c => {
+        const clau = `${c.nom}||${c.varietat||''}`
+        if (!tots.has(clau)) tots.set(clau, c)
+      })
     })
     return Array.from(tots.values())
   }
@@ -147,17 +148,36 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
     }
     return coords[camp?.poble?.nom] || { lat: 41.38, lon: 2.17 }
   }
+  async function obtenirCultiuId(nom) {
+    const { data } = await supabase.from('cultius').select('id').eq('nom', nom).single()
+    return data?.id || null
+  }
 
+  async function obtenirVarietatId(nom, cultiuId) {
+    if (!nom || !cultiuId) return null
+    const { data } = await supabase.from('varietats').select('id').eq('nom', nom).eq('cultiu_id', cultiuId).single()
+    return data?.id || null
+  }
   async function guardar() {
     if (!tascaId || zones.length === 0) return
     setGuardant(true)
 
     const lluna = faseLluna(data)
 
+    const grupId = crypto.randomUUID()
+    // Si hi ha cultiu assignat manualment (quan hi ha múltiples), usar-lo
+    const cultiuIdFinal = cultiuAssignat
+      ? await obtenirCultiuId(cultiuAssignat.nom)
+      : cultiuId ? parseInt(cultiuId) : null
+    const varietatIdFinal = cultiuAssignat?.varietat
+      ? await obtenirVarietatId(cultiuAssignat.varietat, cultiuIdFinal)
+      : varietatId ? parseInt(varietatId) : null
+
     const registres = zones.map(zona => ({
       zona_id: zona.id,
-      cultiu_id: cultiuId ? parseInt(cultiuId) : null,
-      varietat_id: varietatId ? parseInt(varietatId) : null,
+      tasca_grup_id: grupId,
+      cultiu_id: cultiuIdFinal,
+      varietat_id: varietatIdFinal,
       tasca_id: parseInt(tascaId),
       subtasca_id: subtascaId ? parseInt(subtascaId) : null,
       usuari_id: usuariId ? parseInt(usuariId) : null,
@@ -224,19 +244,19 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
           {/* Cultiu actiu — si n'hi ha múltiples, preguntar */}
           {teMulitplesCultius && !mostrarCultiu && (
             <div style={styles.grup}>
-              <label style={styles.etiqueta}>Assignar tasca a quin cultiu?</label>
+              <label style={styles.etiqueta}>Assignar tasca a quin cultiu+varietat?</label>
               <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
                 <div
                   style={{...styles.cultiuOpcio, ...(cultiuAssignat===null?styles.cultiuOpcioActiu:{})}}
                   onClick={() => setCultiuAssignat(null)}>
                   Tots els cultius de la zona
                 </div>
-                {cultiusActiusLlista.map(c => (
-                  <div key={c.nom}
-                    style={{...styles.cultiuOpcio, ...(cultiuAssignat?.nom===c.nom?styles.cultiuOpcioActiu:{})}}
+                {cultiusActiusLlista.map((c, i) => (
+                  <div key={i}
+                    style={{...styles.cultiuOpcio, ...(cultiuAssignat===c?styles.cultiuOpcioActiu:{})}}
                     onClick={() => setCultiuAssignat(c)}>
                     <div style={{width:'12px',height:'12px',borderRadius:'3px',background:c.color||'#ddd',flexShrink:0}}/>
-                    {c.nom}
+                    <span>{c.nom}{c.varietat ? ` · ${c.varietat}` : ''}</span>
                   </div>
                 ))}
               </div>
