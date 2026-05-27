@@ -40,7 +40,7 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
   const [plujaSentmana, setPlujaSentmana] = useState(null)
   const [plujaPrevisio, setPlujaPrevisio] = useState(null)
   const [carregantTemps, setCarregantTemps] = useState(false)
-  const [nt, setnt] = useState(false)
+  const [guardant, setGuardant] = useState(false)  // ✅ CORRECTE
 
   const tascaSeleccionada = tasques.find(t => t.id === parseInt(tascaId))
   const mostrarCultiu = ['Plantar','Sembrar','Zona permanent'].includes(tascaSeleccionada?.nom)
