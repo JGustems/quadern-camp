@@ -195,74 +195,68 @@ export default function App() {
     }
   }
 
-  async function carregaCultiusActius(zones, dataFiltrar = null) {
-    try {
-      const zonaIds = zones.map(z => z?.id).filter(Boolean)
-      if (!zonaIds.length) return
-      
-      let query = supabase
-        .from('registres')
-        .select('zona_id, data, cultius(nom, color), varietats(nom), tasques(nom)')
-        .in('zona_id', zonaIds)
-        .order('data', { ascending: false })
-      
-      if (dataFiltrar) query = query.lte('data', dataFiltrar)
-      
-      const { data, error } = await query
-      if (error) throw error
-      
-      const cultiusPerZona = {}
-      const tasquesPlantacio = ['Plantar', 'Sembrar', 'Zona permanent']
+ async function carregaCultiusActius(zones, dataFiltrar = null) {
+    const zonaIds = zones.map(z => z.id)
+    if (!zonaIds.length) return
+    let query = supabase
+      .from('registres')
+      .select('zona_id, data, cultiu_id, varietat_id, cultius(nom, color), varietats(nom), tasques(nom)')
+      .in('zona_id', zonaIds)
+      .order('data', { ascending: false })
+    if (dataFiltrar) query = query.lte('data', dataFiltrar)
+    const { data } = await query
+    const cultiusPerZona = {}
+    const tasquesPlantacio = ['Plantar', 'Sembrar', 'Zona permanent']
 
-      zones.forEach(zona => {
-        if (!zona?.id) return
-        const regsZona = (data || []).filter(r => r.zona_id === zona.id)
-        const ultimaNetejar = regsZona.find(r => r.tasques?.nom === 'Netejar')
+    zones.forEach(zona => {
+      const regsZona = (data || []).filter(r => r.zona_id === zona.id)
 
-        const plantacions = regsZona.filter(r => {
-          if (!tasquesPlantacio.includes(r.tasques?.nom)) return false
-          if (ultimaNetejar && new Date(r.data) <= new Date(ultimaNetejar.data)) return false
-          return true
-        })
+      // Construir llista de cultius actius tenint en compte neteja selectiva
+      const cultiusActiusMap = new Map() // clau: cultiu_id||varietat_id
 
-        if (!plantacions.length) return
+      regsZona.forEach(r => {
+        const tasca = r.tasques?.nom
+        const clau = `${r.cultiu_id||''}||${r.varietat_id||''}`
 
-        const totsVists = new Set()
-        const tots = []
-        plantacions.forEach(p => {
-          const nomCultiu = p.cultius?.nom
-          const nomVarietat = p.varietats?.nom
-          if (!nomCultiu) return
-          const clau = `${nomCultiu}||${nomVarietat}`
-          if (!totsVists.has(clau)) {
-            totsVists.add(clau)
-            tots.push({
-              nom: nomCultiu,
-              color: p.cultius.color,
-              varietat: nomVarietat && nomVarietat !== '-' ? nomVarietat : null,
+        if (tasquesPlantacio.includes(tasca) && r.cultius?.nom) {
+          // Afegir cultiu actiu si no existeix ja
+          if (!cultiusActiusMap.has(clau)) {
+            cultiusActiusMap.set(clau, {
+              nom: r.cultius.nom,
+              color: r.cultius.color,
+              varietat: r.varietats?.nom && r.varietats.nom !== '-' ? r.varietats.nom : null,
+              cultiu_id: r.cultiu_id,
+              varietat_id: r.varietat_id,
+              data: r.data,
             })
           }
-        })
-
-        const cultiusVists = new Set()
-        const perColor = []
-        tots.forEach(t => {
-          if (!cultiusVists.has(t.nom)) {
-            cultiusVists.add(t.nom)
-            perColor.push(t)
+        } else if (tasca === 'Netejar') {
+          if (r.cultiu_id) {
+            // Netejar selectiu: eliminar només el cultiu+varietat específic
+            cultiusActiusMap.delete(clau)
+          } else {
+            // Netejar sense cultiu: eliminar tots
+            cultiusActiusMap.clear()
           }
-        })
-
-        if (tots.length > 0) {
-          cultiusPerZona[zona.id] = perColor
-          cultiusPerZona[zona.id].tots = tots
         }
       })
-      setCultiusActius(cultiusPerZona)
-    } catch (e) {
-      console.error('Error carregant cultius:', e)
-      setCultiusActius({})
-    }
+
+      const tots = Array.from(cultiusActiusMap.values())
+      const perColor = []
+      const cultiusVists = new Set()
+      tots.forEach(t => {
+        if (!cultiusVists.has(t.nom)) {
+          cultiusVists.add(t.nom)
+          perColor.push(t)
+        }
+      })
+
+      if (tots.length > 0) {
+        cultiusPerZona[zona.id] = perColor
+        cultiusPerZona[zona.id].tots = tots
+      }
+    })
+    setCultiusActius(cultiusPerZona)
   }
 
   function toggleZona(zona) {
