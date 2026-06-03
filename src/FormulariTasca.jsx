@@ -44,6 +44,7 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
 
   const tascaSeleccionada = tasques.find(t => t.id === parseInt(tascaId))
   const mostrarCultiu = ['Plantar','Sembrar','Zona permanent'].includes(tascaSeleccionada?.nom)
+  const esNetejar = tascaSeleccionada?.nom === 'Netejar'
 
   // Cultius actius a les zones seleccionades
   const cultiusActiusZones = () => {
@@ -160,6 +161,11 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
   }
   async function guardar() {
     if (!tascaId || zones.length === 0) return
+    // ✅ NOVA VALIDACIÓ: Si és "Netejar", obligatori seleccionar cultiu
+  if (esNetejar && !cultiuAssignat) {
+    alert('Has de seleccionar quin cultiu vols netejar')
+    return
+  }
     setGuardant(true)
 
     const lluna = faseLluna(data)
@@ -242,26 +248,31 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
           {carregantTemps && <div style={styles.carregant}>Carregant dades meteorològiques...</div>}
 
           {/* Cultiu actiu — si n'hi ha múltiples, preguntar */}
-          {teMulitplesCultius && !mostrarCultiu && (
-            <div style={styles.grup}>
-              <label style={styles.etiqueta}>Assignar tasca a quin cultiu+varietat?</label>
-              <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
-                <div
-                  style={{...styles.cultiuOpcio, ...(cultiuAssignat===null?styles.cultiuOpcioActiu:{})}}
-                  onClick={() => setCultiuAssignat(null)}>
-                  Tots els cultius de la zona
-                </div>
-                {cultiusActiusLlista.map((c, i) => (
-                  <div key={i}
-                    style={{...styles.cultiuOpcio, ...(cultiuAssignat===c?styles.cultiuOpcioActiu:{})}}
-                    onClick={() => setCultiuAssignat(c)}>
-                    <div style={{width:'12px',height:'12px',borderRadius:'3px',background:c.color||'#ddd',flexShrink:0}}/>
-                    <span>{c.nom}{c.varietat ? ` · ${c.varietat}` : ''}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          {/* Cultiu actiu — si n'hi ha múltiples, preguntar (SEMPRE per Netejar) */}
+{(teMulitplesCultius || esNetejar) && !mostrarCultiu && (
+  <div style={styles.grup}>
+    <label style={styles.etiqueta}>
+      {esNetejar ? 'Quin cultiu vols netejar?' : 'Assignar tasca a quin cultiu+varietat?'}
+    </label>
+    <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
+      {esNetejar ? null : (
+        <div
+          style={{...styles.cultiuOpcio, ...(cultiuAssignat===null?styles.cultiuOpcioActiu:{})}}
+          onClick={() => setCultiuAssignat(null)}>
+          Tots els cultius de la zona
+        </div>
+      )}
+      {cultiusActiusLlista.map((c, i) => (
+        <div key={i}
+          style={{...styles.cultiuOpcio, ...(cultiuAssignat===c?styles.cultiuOpcioActiu:{})}}
+          onClick={() => setCultiuAssignat(c)}>
+          <div style={{width:'12px',height:'12px',borderRadius:'3px',background:c.color||'#ddd',flexShrink:0}}/>
+          <span>{c.nom}{c.varietat ? ` · ${c.varietat}` : ''}</span>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
 
           <div style={styles.grup}>
             <label style={styles.etiqueta}>Tasca *</label>
