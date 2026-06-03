@@ -443,14 +443,14 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
                   })()}
                 </>
               ) : (
-                /* Cas 3: Zona d'un sol cultiu o seleccionada */
-                <polygon
-                  points={ptsToString(pts)}
-                  fill={colorZona(zona, cultiusZona, sel)}
-                  stroke={sel ? '#1D9E75' : 'rgba(0,0,0,0.15)'}
-                  strokeWidth={sel ? 3 : 1}
-                />
-              )}
+  /* Cas 3: Zona d'un sol cultiu o seleccionada */
+  <polygon
+    points={ptsToString(pts)}
+    fill={sel ? '#B5D4F4' : zona.mode_text === 'nom' ? zona.color || '#e8e4de' : cultiusZona.length > 0 ? cultiusZona[0].color : zona.color || '#e8e4de'}
+    stroke={sel ? '#1D9E75' : 'rgba(0,0,0,0.15)'}
+    strokeWidth={sel ? 3 : 1}
+  />
+)}
 
 {/* Text identificador */}
 {zona.mostrar_nom !== false && (() => {
