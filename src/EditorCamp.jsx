@@ -539,14 +539,14 @@ function moureZona(direccio) {
     setZones(novesZones)
   }
 
-  function toggleMostrarNom(valor) {
+  function canviarModeText(valor) {
     setZones(prev => prev.map(z => {
       if ((z.id && z.id===zonesSeleccionades[0].id)||(z.tempId && z.tempId===zonesSeleccionades[0].tempId)) {
-        return {...z, mostrar_nom: valor}
+        return {...z, mode_text: valor}
       }
       return z
     }))
-    setZonesSeleccionades(prev => prev.map(z => ({...z, mostrar_nom: valor})))
+    setZonesSeleccionades(prev => prev.map(z => ({...z, mode_text: valor})))
   }
   async function guardar() {
     setGuardant(true)
@@ -582,6 +582,7 @@ function moureZona(direccio) {
         nom_posicio: nomPosicions[z.id] || null,
         ordre: z.ordre ?? 0,
         mostrar_nom: z.mostrar_nom !== false,
+        mode_text: z.mode_text || 'cultiu',
       }).eq('id', z.id)
       }
 
@@ -605,6 +606,7 @@ function moureZona(direccio) {
           nom_posicio: nomPosicions[z.tempId] || null,
           ordre: z.ordre ?? 0,
           mostrar_nom: z.mostrar_nom !== false,
+        mode_text: z.mode_text || 'cultiu',
         }
       })
         const { error } = await supabase.from('zones').insert(zonesAInserir)
@@ -802,12 +804,14 @@ function moureZona(direccio) {
                     )}
                     {zonesSeleccionades.length === 1 && (
                       <div style={{marginTop:'6px'}}>
-                        <label style={{display:'flex', alignItems:'center', gap:'8px', fontSize:'13px', color:'#555', cursor:'pointer'}}>
-                          <input type="checkbox"
-                            checked={zonesSeleccionades[0].mostrar_nom !== false}
-                            onChange={e => toggleMostrarNom(e.target.checked)}/>
-                          Mostrar nom al mapa
-                        </label>
+                        <label style={styles.label}>Text al mapa</label>
+                        <select style={styles.input}
+                          value={zonesSeleccionades[0].mode_text || 'cultiu'}
+                          onChange={e => canviarModeText(e.target.value)}>
+                          <option value="cultiu">Cultiu (o nom si no n'hi ha)</option>
+                          <option value="nom">Sempre el nom de la zona</option>
+                          <option value="cap">No mostrar res</option>
+                        </select>
                       </div>
                     )}
                     <button style={{...styles.botoPrimari, background:'#e55', marginTop:'6px'}}
