@@ -399,49 +399,47 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
               onMouseLeave={() => setTooltip(null)}
               style={{pointerEvents:'visiblePainted'}}>
 
-              {/* Cas 1: Zona mixta amb 2 cultius */}
-              {cultiusZona.length === 2 && !sel ? (
-                <>
-                  <clipPath id={`clip-${zona.id}`}>
-                    <polygon points={ptsToString(pts)}/>
-                  </clipPath>
-                  <polygon points={ptsToString(pts)} fill="transparent" stroke={sel?'#1D9E75':'rgba(0,0,0,0.15)'} strokeWidth={sel?3:1}/>
-                  {(() => {
-                    const minX = Math.min(...pts.map(p=>p.x))
-                    const maxX = Math.max(...pts.map(p=>p.x))
-                    const minY = Math.min(...pts.map(p=>p.y))
-                    const maxY = Math.max(...pts.map(p=>p.y))
-                    return (
-                      <g clipPath={`url(#clip-${zona.id})`}>
-                        <polygon points={`${minX},${minY} ${maxX},${minY} ${minX},${maxY}`} fill={cultiusZona[0].color||'#C0DD97'}/>
-                        <polygon points={`${maxX},${minY} ${maxX},${maxY} ${minX},${maxY}`} fill={cultiusZona[1].color||'#FAC775'}/>
-                        <polygon points={ptsToString(pts)} fill="transparent" stroke="rgba(0,0,0,0.15)" strokeWidth={1}/>
-                      </g>
-                    )
-                  })()}
-                </>
-              ) : cultiusZona.length > 2 && !sel ? (
-                /* Cas 2: Zona mixta amb més de 2 cultius */
-                <>
-                  <clipPath id={`clip-${zona.id}`}>
-                    <polygon points={ptsToString(pts)}/>
-                  </clipPath>
-                  {(() => {
-                    const minY = Math.min(...pts.map(p=>p.y))
-                    const maxY = Math.max(...pts.map(p=>p.y))
-                    const minX = Math.min(...pts.map(p=>p.x))
-                    const maxX = Math.max(...pts.map(p=>p.x))
-                    const alcada = (maxY - minY) / cultiusZona.length
-                    return (
-                      <g clipPath={`url(#clip-${zona.id})`}>
-                        {cultiusZona.map((cu, i) => (
-                          <rect key={i} x={minX} y={minY+i*alcada} width={maxX-minX} height={alcada} fill={cu.color||'#C0DD97'}/>
-                        ))}
-                        <polygon points={ptsToString(pts)} fill="transparent" stroke="rgba(0,0,0,0.15)" strokeWidth={1}/>
-                      </g>
-                    )
-                  })()}
-                </>
+              {cultiusZona.length === 2 && !sel && zona.mode_text !== 'nom' ? (
+  <>
+    <clipPath id={`clip-${zona.id}`}>
+      <polygon points={ptsToString(pts)}/>
+    </clipPath>
+    <polygon points={ptsToString(pts)} fill="transparent" stroke={sel?'#1D9E75':'rgba(0,0,0,0.15)'} strokeWidth={sel?3:1}/>
+    {(() => {
+      const minX = Math.min(...pts.map(p=>p.x))
+      const maxX = Math.max(...pts.map(p=>p.x))
+      const minY = Math.min(...pts.map(p=>p.y))
+      const maxY = Math.max(...pts.map(p=>p.y))
+      return (
+        <g clipPath={`url(#clip-${zona.id})`}>
+          <polygon points={`${minX},${minY} ${maxX},${minY} ${minX},${maxY}`} fill={cultiusZona[0].color||'#C0DD97'}/>
+          <polygon points={`${maxX},${minY} ${maxX},${maxY} ${minX},${maxY}`} fill={cultiusZona[1].color||'#FAC775'}/>
+          <polygon points={ptsToString(pts)} fill="transparent" stroke="rgba(0,0,0,0.15)" strokeWidth={1}/>
+        </g>
+      )
+    })()}
+  </>
+              ) : cultiusZona.length > 2 && !sel && zona.mode_text !== 'nom' ? (
+  <>
+    <clipPath id={`clip-${zona.id}`}>
+      <polygon points={ptsToString(pts)}/>
+    </clipPath>
+    {(() => {
+      const minY = Math.min(...pts.map(p=>p.y))
+      const maxY = Math.max(...pts.map(p=>p.y))
+      const minX = Math.min(...pts.map(p=>p.x))
+      const maxX = Math.max(...pts.map(p=>p.x))
+      const alcada = (maxY - minY) / cultiusZona.length
+      return (
+        <g clipPath={`url(#clip-${zona.id})`}>
+          {cultiusZona.map((cu, i) => (
+            <rect key={i} x={minX} y={minY+i*alcada} width={maxX-minX} height={alcada} fill={cu.color||'#C0DD97'}/>
+          ))}
+          <polygon points={ptsToString(pts)} fill="transparent" stroke="rgba(0,0,0,0.15)" strokeWidth={1}/>
+        </g>
+      )
+    })()}
+  </>
               ) : (
   /* Cas 3: Zona d'un sol cultiu o seleccionada */
   <polygon
