@@ -453,33 +453,38 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
               )}
 
               {/* Text identificador */}
-              {zona.mode_text !== 'cap' && zona.mostrar_nom !== false && (() => {
-                const modeText = zona.mode_text || 'cultiu'
-                let text = ''
-                if (sel) {
-                  text = zona.codi
-                } else if (modeText === 'nom') {
-                  text = zona.nom || zona.codi
-                } else {
-                  // mode 'cultiu'
-                  if (cultiusZona.length === 0) text = zona.codi
-                  else if (cultiusZona.length === 1) text = cultiusZona[0].nom
-                  else text = `${cultiusZona.length} cultius`
-                }
-                if (!text) return null
-                return (
-                  <text
-                    x={nomPos.x} y={nomPos.y}
-                    textAnchor="middle"
-                    dominantBaseline="middle"
-                    fontSize={mida}
-                    fontWeight={cultiusZona.length > 0 && modeText === 'cultiu' ? 'bold' : 'normal'}
-                    fill={sel ? '#042C53' : cultiusZona.length > 0 && modeText === 'cultiu' ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.3)'}
-                    style={{pointerEvents:'none', userSelect:'none'}}>
-                    {text}
-                  </text>
-                )
-              })()}
+{zona.mostrar_nom !== false && (() => {
+  const modeText = zona.mode_text || 'cultiu'
+  let text = ''
+  
+  if (sel) {
+    text = zona.codi
+  } else if (modeText === 'nom') {
+    // ✅ Sempre mostrar el nom de la zona
+    text = zona.nom || zona.codi
+  } else if (modeText === 'cultiu') {
+    // ✅ Mostrar cultius actius
+    if (cultiusZona.length === 0) text = zona.codi
+    else if (cultiusZona.length === 1) text = cultiusZona[0].nom
+    else text = `${cultiusZona.length} cultius`
+  }
+  // Si modeText === 'cap', no mostrar res
+  
+  if (!text) return null
+  
+  return (
+    <text
+      x={nomPos.x} y={nomPos.y}
+      textAnchor="middle"
+      dominantBaseline="middle"
+      fontSize={mida}
+      fontWeight={modeText === 'nom' ? 'bold' : cultiusZona.length > 0 && modeText === 'cultiu' ? 'bold' : 'normal'}
+      fill={sel ? '#042C53' : modeText === 'nom' ? 'rgba(0,0,0,0.75)' : cultiusZona.length > 0 && modeText === 'cultiu' ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.3)'}
+      style={{pointerEvents:'none', userSelect:'none'}}>
+      {text}
+    </text>
+  )
+})()}
             </g>
           )
         })}
