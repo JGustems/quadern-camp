@@ -114,9 +114,27 @@ export default function GestioRegistres({ onTancar }) {
     if (filtre.cultiu && r.cultius?.nom !== filtre.cultiu) return false
     return true
   })
+// Agrupar per tasca_grup_id
+  const registresAgrupats = (() => {
+    const grups = new Map()
+    registresFiltrats.forEach(r => {
+      const clau = r.tasca_grup_id || r.id.toString()
+      if (!grups.has(clau)) {
+        grups.set(clau, { ...r, zones_agrupades: [r.zones], _ids: [r.id] })
+      } else {
+        const grup = grups.get(clau)
+        if (r.zones?.codi && !grup.zones_agrupades.find(z => z?.codi === r.zones?.codi)) {
+          grup.zones_agrupades.push(r.zones)
+        }
+        grup._ids.push(r.id)
+      }
+    })
+    return Array.from(grups.values())
+  })()
 
-  const registresPagina = registresFiltrats.slice(pagina*PER_PAGINA, (pagina+1)*PER_PAGINA)
-  const totalPagines = Math.ceil(registresFiltrats.length / PER_PAGINA)
+  const registresPagina = registresAgrupats.slice(pagina*PER_PAGINA, (pagina+1)*PER_PAGINA)
+  const totalPagines = Math.ceil(registresAgrupats.length / PER_PAGINA)
+  
 
   return (
     <div style={styles.overlay}>
@@ -146,7 +164,7 @@ export default function GestioRegistres({ onTancar }) {
           <input type="month" style={styles.filtre} value={filtre.data}
             onChange={e => { setFiltre(f=>({...f,data:e.target.value})); setPagina(0) }}/>
           <span style={{fontSize:'12px', color:'#888'}}>
-            {registresFiltrats.length} registres
+            {registresAgrupats.length} tasques ({registresFiltrats.length} registres)
           </span>
         </div>
 
@@ -168,8 +186,11 @@ export default function GestioRegistres({ onTancar }) {
                       {r.tasques?.nom}
                       {r.subtasques?.nom && <span style={styles.sub}> · {r.subtasques.nom}</span>}
                     </div>
-                    <div style={styles.registreInfo}>
-                      {r.zones?.camps?.pobles?.nom} · {r.zones?.camps?.nom} · Zona {r.zones?.codi}
+                   <div style={styles.registreInfo}>
+                      {r.zones_agrupades?.length > 1
+                        ? `${r.zones?.camps?.pobles?.nom} · ${r.zones?.camps?.nom} · Zones: ${r.zones_agrupades.map(z=>z?.codi).join(', ')}`
+                        : `${r.zones?.camps?.pobles?.nom} · ${r.zones?.camps?.nom} · Zona ${r.zones?.codi}`
+                      }
                       {r.cultius?.nom && ` · ${r.cultius.nom}`}
                       {r.varietats?.nom && r.varietats.nom !== '-' && ` (${r.varietats.nom})`}
                     </div>
