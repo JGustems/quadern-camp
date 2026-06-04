@@ -64,11 +64,11 @@ export default function InformeCicles({ onTancar }) {
       .in('zona_id', zonaIds)
       .order('data', { ascending: true })
 
-    // 4. Agrupar plantacions per data + varietat (mateix dia = mateix cicle)
+    // 4. Agrupar plantacions per tasca_grup_id (si en té) o per data+varietat
     const ciclesMap = {}
     plantacions.forEach(p => {
       const varNom = p.varietats?.nom || '-'
-      const clau = `${p.data}||${varNom}`
+      const clau = p.tasca_grup_id || `${p.data}||${varNom}`
       if (!ciclesMap[clau]) {
         ciclesMap[clau] = {
           dataInici: p.data,
