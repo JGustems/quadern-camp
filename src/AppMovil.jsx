@@ -3,6 +3,7 @@ import { supabase } from './supabase'
 import MapaCamp from './MapaCamp.jsx'
 import FormulariTasca from './FormulariTasca.jsx'
 import Historial from './Historial.jsx'
+import Planters from './Planters.jsx'
 
 export default function AppMovil({
   usuari, pobles, camps, zones, cultiusActius, dataConsulta,
@@ -15,6 +16,7 @@ export default function AppMovil({
   const [mostrarFormulari, setMostrarFormulari] = useState(false)
   const [mostrarHistorial, setMostrarHistorial] = useState(false)
   const [zonaInfo, setZonaInfo] = useState(null)
+  const [mostrarPlanters, setMostrarPlanters] = useState(false)
 
   function handleToggleZona(zona) {
     onToggleZona(zona)
@@ -57,6 +59,11 @@ export default function AppMovil({
         <div style={styles.selectorOverlay} onClick={() => setMostrarSelectorCamp(false)}>
           <div style={styles.selectorModal} onClick={e => e.stopPropagation()}>
             <div style={styles.selectorTitol}>Selecciona camp</div>
+            <div
+              style={{...styles.selectorCamp, background:'#E1F5EE', color:'#0F6E56', fontWeight:'500', marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px'}}
+              onClick={() => { setMostrarSelectorCamp(false); setMostrarPlanters(true) }}>
+              🌱 Planters
+            </div>
             {pobles.map(p => (
               <div key={p.id}>
                 <div style={styles.selectorPoble}>{p.nom}</div>
@@ -251,6 +258,9 @@ export default function AppMovil({
           zones={zonesSeleccionades}
           onTancar={() => setMostrarHistorial(false)}
         />
+      )}
+      {mostrarPlanters && (
+        <Planters onTancar={() => setMostrarPlanters(false)} />
       )}
     </div>
   )
