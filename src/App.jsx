@@ -356,7 +356,7 @@ async function carregaCultiusActius(zones, dataFiltrar = null) {
       pobleSeleccionat={pobleSeleccionat}
       campSeleccionat={campSeleccionat}
       zonesSeleccionades={zonesSeleccionades}
-      onSeleccionaPoble={seleccionaPoble}
+      onSeleccionaPoble={(p) => { setPobleSeleccionat(p); seleccionaPoble(p) }}
       onSeleccionaCamp={seleccionaCamp}
       onToggleZona={toggleZona}
       onSeleccionaFila={seleccionaFila}
