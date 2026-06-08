@@ -63,7 +63,7 @@ export default function AppMovil({
                 {camps.filter(c => c.poble_id === p.id).map(c => (
                   <div key={c.id}
                     style={{...styles.selectorCamp, ...(campSeleccionat?.id===c.id?styles.selectorActiu:{})}}
-                    onClick={() => { onSeleccionaPoble(p); onSeleccionaCamp(c); setMostrarSelectorCamp(false) }}>
+                    onClick={() => { onSeleccionaPoble(p); onSeleccionaCamp(c); setMostrarSelectorCamp(false); setZonaInfo(null) }}>
                     {c.nom}
                   </div>
                 ))}
@@ -237,6 +237,7 @@ export default function AppMovil({
         <FormulariTasca
           zones={zonesSeleccionades}
           camp={campAmbPoble()}
+          cultiusActius={cultiusActius}
           onTancar={() => setMostrarFormulari(false)}
           onGuardat={() => {
             setMostrarFormulari(false)
