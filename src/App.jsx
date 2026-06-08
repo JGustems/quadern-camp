@@ -163,15 +163,6 @@ export default function App() {
     setCampSeleccionat(null)
     setZones([])
     setZonesSeleccionades([])
-    try {
-      const { data, error } = await supabase
-        .from('camps').select('*').eq('poble_id', poble.id).order('nom')
-      if (error) throw error
-      setCamps(data || [])
-    } catch (e) {
-      console.error('Error seleccionant poble:', e)
-      setCamps([])
-    }
   }
 
   async function seleccionaCamp(camp) {
