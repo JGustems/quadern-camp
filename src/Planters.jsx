@@ -151,348 +151,299 @@ export default function Planters({ onTancar }) {
   const plantersActius = planters.filter(p => p.estat === 'actiu')
   const plantersGastats = planters.filter(p => p.estat === 'gastat')
 
-  return (
-    <div style={styles.overlay}>
-      <div style={styles.modal}>
-        <div style={styles.cap}>
-          <div style={styles.titol}>🌱 Planters</div>
-          <div style={{display:'flex', gap:'8px'}}>
-            <button style={styles.botoNou} onClick={() => setMostrarNouPlanter(true)}>+ Nou planter</button>
-            <button style={styles.botoTancar} onClick={onTancar}>✕</button>
-          </div>
+  const esMobil = window.innerWidth < 768
+  const [vistaMovil, setVistaMovil] = useState('llista') // 'llista' | 'graella'
+  const [mostrarPanellMovil, setMostrarPanellMovil] = useState(false)
+
+  if (esMobil) return (
+    <div style={{position:'fixed', inset:0, background:'white', display:'flex', flexDirection:'column', zIndex:1000}}>
+      {/* Capçalera mòbil */}
+      <div style={{background:'#1D9E75', padding:'12px 16px', display:'flex', alignItems:'center', gap:'12px', flexShrink:0}}>
+        {vistaMovil === 'graella' && (
+          <button style={{background:'none', border:'none', color:'white', fontSize:'20px', cursor:'pointer', padding:'0'}}
+            onClick={() => { setVistaMovil('llista'); setPlanterActiu(null); setCellaSeleccionada(null); setCellesSeleccionades([]) }}>
+            ←
+          </button>
+        )}
+        <div style={{flex:1, color:'white', fontWeight:'600', fontSize:'16px'}}>
+          {vistaMovil === 'llista' ? '🌱 Planters' : planterActiu?.nom || 'Planter'}
         </div>
+        {vistaMovil === 'llista' && (
+          <button style={{background:'rgba(255,255,255,0.2)', border:'none', color:'white', borderRadius:'8px', padding:'6px 12px', fontSize:'13px', cursor:'pointer'}}
+            onClick={() => setMostrarNouPlanter(true)}>
+            + Nou
+          </button>
+        )}
+        {vistaMovil === 'graella' && planterActiu?.estat === 'actiu' && (
+          <button style={{background:'rgba(255,255,255,0.2)', border:'none', color:'white', borderRadius:'8px', padding:'6px 10px', fontSize:'12px', cursor:'pointer'}}
+            onClick={() => { if(window.confirm('Marcar com a gastat?')) marcarGastat(planterActiu) }}>
+            ✓ Gastat
+          </button>
+        )}
+        <button style={{background:'none', border:'none', color:'white', fontSize:'20px', cursor:'pointer'}}
+          onClick={onTancar}>✕</button>
+      </div>
 
-        <div style={styles.cos}>
-          {/* Llista de planters */}
-          <div style={styles.sidebar}>
-            {plantersActius.length > 0 && (
-              <>
-                <div style={styles.seccio}>Actius ({plantersActius.length})</div>
-                {plantersActius.map(p => (
-                  <div key={p.id}
-                    style={{...styles.planterItem, ...(planterActiu?.id===p.id?styles.planterActiu:{})}}
-                    onClick={() => { setPlanterActiu(p); setVistaActiva('editar'); setCellaSeleccionada(null); setCellesSeleccionades([]) }}>
-                    <div style={styles.planterNom}>{p.nom}</div>
-                    <div style={styles.planterInfo}>{p.files}×{p.columnes} · {p.ubicacio}</div>
-                    <div style={styles.planterData}>{new Date(p.data_inici).toLocaleDateString('ca-ES')}</div>
+      {/* Vista llista de planters */}
+      {vistaMovil === 'llista' && (
+        <div style={{flex:1, overflowY:'auto', padding:'12px'}}>
+          {planters.length === 0 && (
+            <div style={{textAlign:'center', color:'#aaa', padding:'40px', fontSize:'14px'}}>
+              <div style={{fontSize:'40px', marginBottom:'12px'}}>🌱</div>
+              Crea un planter amb "+ Nou"
+            </div>
+          )}
+          {plantersActius.length > 0 && (
+            <>
+              <div style={{fontSize:'11px', fontWeight:'600', color:'#999', textTransform:'uppercase', marginBottom:'8px'}}>Actius</div>
+              {plantersActius.map(p => (
+                <div key={p.id} style={{border:'1px solid #eee', borderRadius:'10px', padding:'14px', marginBottom:'8px', cursor:'pointer'}}
+                  onClick={() => { setPlanterActiu(p); carregaCelles(p.id); setVistaMovil('graella'); setCellaSeleccionada(null); setCellesSeleccionades([]) }}>
+                  <div style={{fontSize:'15px', fontWeight:'600', color:'#333'}}>{p.nom}</div>
+                  <div style={{fontSize:'12px', color:'#888', marginTop:'4px'}}>{p.files}×{p.columnes} cel·les · {p.ubicacio} · {new Date(p.data_inici).toLocaleDateString('ca-ES')}</div>
+                </div>
+              ))}
+            </>
+          )}
+          {plantersGastats.length > 0 && (
+            <>
+              <div style={{fontSize:'11px', fontWeight:'600', color:'#999', textTransform:'uppercase', marginBottom:'8px', marginTop:'16px'}}>Gastats</div>
+              {plantersGastats.map(p => (
+                <div key={p.id} style={{border:'1px solid #eee', borderRadius:'10px', padding:'14px', marginBottom:'8px', cursor:'pointer', opacity:0.6}}
+                  onClick={() => { setPlanterActiu(p); carregaCelles(p.id); setVistaMovil('graella'); setCellaSeleccionada(null); setCellesSeleccionades([]) }}>
+                  <div style={{fontSize:'15px', fontWeight:'600', color:'#333'}}>{p.nom}</div>
+                  <div style={{fontSize:'12px', color:'#888', marginTop:'4px'}}>{p.files}×{p.columnes} cel·les · {p.ubicacio}</div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Vista graella */}
+      {vistaMovil === 'graella' && planterActiu && (
+        <div style={{flex:1, overflow:'auto', position:'relative'}}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: `repeat(${planterActiu.columnes}, minmax(36px, 50px))`,
+            gap: '3px',
+            padding: '12px',
+          }}>
+            {Array.from({length: planterActiu.files}, (_,fi) =>
+              Array.from({length: planterActiu.columnes}, (_,ci) => {
+                const cella = cellesActives.find(c => c.fila===fi+1 && c.columna===ci+1)
+                const seleccionada = cellesSeleccionades.some(c => c.id === cella?.id)
+                const estaX = cella?.estat === 'x'
+                const estaSembrada = cella?.estat === 'sembrada'
+                return (
+                  <div key={`${fi}-${ci}`}
+                    onClick={() => { if(cella) { toggleCella(cella); setMostrarPanellMovil(true) } }}
+                    style={{
+                      aspectRatio: '1',
+                      background: estaX ? '#ccc' : estaSembrada ? (cella.cultius?.color || '#C0DD97') : 'white',
+                      border: seleccionada ? '2px solid #1D9E75' : '1px solid #ddd',
+                      borderRadius: '4px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                      position: 'relative',
+                    }}>
+                    {estaX ? (
+                      <span style={{fontSize:'18px', fontWeight:'bold', color:'#888'}}>✕</span>
+                    ) : estaSembrada ? (
+                      <>
+                        <span style={{fontSize:'9px', fontWeight:'600', color:'#333', textAlign:'center', lineHeight:1.2, padding:'1px'}}>
+                          {cella.cultius?.nom?.substring(0,8)}
+                        </span>
+                        {cella.varietats?.nom && cella.varietats.nom !== '-' && (
+                          <span style={{fontSize:'8px', color:'#555', textAlign:'center'}}>
+                            {cella.varietats.nom.substring(0,8)}
+                          </span>
+                        )}
+                      </>
+                    ) : null}
+                    {seleccionada && (
+                      <div style={{position:'absolute', top:'2px', right:'3px', fontSize:'10px', color:'#1D9E75'}}>✓</div>
+                    )}
                   </div>
-                ))}
-              </>
-            )}
-            {plantersGastats.length > 0 && (
-              <>
-                <div style={{...styles.seccio, marginTop:'16px'}}>Gastats ({plantersGastats.length})</div>
-                {plantersGastats.map(p => (
-                  <div key={p.id}
-                    style={{...styles.planterItem, opacity:0.6, ...(planterActiu?.id===p.id?styles.planterActiu:{})}}
-                    onClick={() => { setPlanterActiu(p); setVistaActiva('editar'); setCellaSeleccionada(null); setCellesSeleccionades([]) }}>
-                    <div style={styles.planterNom}>{p.nom}</div>
-                    <div style={styles.planterInfo}>{p.files}×{p.columnes} · {p.ubicacio}</div>
-                  </div>
-                ))}
-              </>
-            )}
-            {planters.length === 0 && (
-              <div style={{color:'#aaa', fontSize:'13px', padding:'12px'}}>
-                No hi ha planters. Crea'n un amb "+ Nou planter".
-              </div>
+                )
+              })
             )}
           </div>
 
-          {/* Graella del planter */}
-          <div style={styles.principal}>
-            {planterActiu ? (
-              <div style={{display:'flex', flexDirection:'column', height:'100%'}}>
-                <div style={styles.planterHeader}>
-                  <div style={{flex:1}}>
-                    <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-                      <input
-                        style={{fontSize:'15px', fontWeight:'600', color:'#333', border:'none', borderBottom:'1px solid transparent', background:'transparent', padding:'2px 4px', borderRadius:'4px', flex:1}}
-                        value={planterActiu.nom}
-                        onChange={async e => {
-                          const nouNom = e.target.value
-                          setPlanterActiu(prev => ({...prev, nom: nouNom}))
-                          setPlanters(prev => prev.map(p => p.id === planterActiu.id ? {...p, nom: nouNom} : p))
-                          await supabase.from('planters').update({ nom: nouNom }).eq('id', planterActiu.id)
-                        }}
-                        onFocus={e => e.target.style.borderBottomColor='#1D9E75'}
-                        onBlur={e => e.target.style.borderBottomColor='transparent'}
-                      />
-                    </div>
-                    <div style={styles.planterSubtitol}>
-                      {planterActiu.files}×{planterActiu.columnes} cel·les · {planterActiu.ubicacio}
-                      {planterActiu.estat === 'gastat' && <span style={styles.badgeGastat}>Gastat</span>}
-                    </div>
-                  </div>
-                  {planterActiu.estat === 'actiu' && (
-                    <button style={styles.botoGastat}
-                      onClick={() => { if(window.confirm('Marcar com a gastat?')) marcarGastat(planterActiu) }}>
-                      ✓ Marcar com gastat
-                    </button>
-                  )}
-                </div>
-
-                <div style={styles.graellaWrap}>
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: `repeat(${planterActiu.columnes}, minmax(28px, 40px))`,
-                    gap: '2px',
-                    padding: '12px',
-                  }}>
-                    {Array.from({length: planterActiu.files}, (_,fi) =>
-                    Array.from({length: planterActiu.columnes}, (_,ci) => {
-                      const cella = cellesActives.find(c => c.fila===fi+1 && c.columna===ci+1)
-                      const seleccionada = cellesSeleccionades.some(c => c.id === cella?.id)
-                      const estaX = cella?.estat === 'x'
-                      const estaSembrada = cella?.estat === 'sembrada'
-                      return (
-                        <div key={`${fi}-${ci}`}
-                            onClick={() => cella && toggleCella(cella)}
-                            onMouseEnter={e => {
-                              if (!cella || cella.estat === 'buida' || cella.estat === 'x') return
-                              setTooltipCella({
-                                x: e.clientX, y: e.clientY,
-                                cultiu: cella.cultius?.nom,
-                                varietat: cella.varietats?.nom && cella.varietats.nom !== '-' ? cella.varietats.nom : null,
-                                data: cella.data_sembra,
-                                notes: cella.notes,
-                                fila: cella.fila, columna: cella.columna,
-                              })
-                            }}
-                            onMouseLeave={() => setTooltipCella(null)}
-                            style={{
-                            aspectRatio: '1',
-                            background: estaX ? '#ccc' : estaSembrada ? (cella.cultius?.color || '#C0DD97') : 'white',
-                            border: seleccionada ? '2px solid #1D9E75' : '1px solid #ddd',
-                            borderRadius: '3px',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            overflow: 'hidden',
-                            position: 'relative',
-                          }}>
-                          {estaX ? (
-                            <span style={{fontSize:'16px', fontWeight:'bold', color:'#888', lineHeight:1}}>✕</span>
-                          ) : estaSembrada ? (
-                            <>
-                              <span style={{fontSize:'8px', fontWeight:'600', color:'#333', textAlign:'center', lineHeight:1.2, padding:'1px'}}>
-                                {cella.cultius?.nom?.substring(0,8)}
-                              </span>
-                              {cella.varietats?.nom && cella.varietats.nom !== '-' && (
-                                <span style={{fontSize:'7px', color:'#555', textAlign:'center', lineHeight:1.1}}>
-                                  {cella.varietats.nom.substring(0,8)}
-                                </span>
-                              )}
-                            </>
-                          ) : null}
-                          {seleccionada && (
-                            <div style={{position:'absolute', top:'1px', right:'2px', fontSize:'8px', color:'#1D9E75'}}>✓</div>
-                          )}
-                        </div>
-                      )
-                    })
-                  )}
-                  </div>
-                </div>
-
-                {/* Llegenda */}
-                <div style={styles.llegenda}>
-                  <div style={styles.llegendaItem}><div style={{...styles.llegendaDot, background:'white', border:'1px solid #ddd'}}/> Buida</div>
-                  <div style={styles.llegendaItem}><div style={{...styles.llegendaDot, background:'#e0e0e0'}}/> No usada (X)</div>
-                  <div style={styles.llegendaItem}><div style={{...styles.llegendaDot, background:'#C0DD97'}}/> Sembrada</div>
-                </div>
-              </div>
-            ) : (
-              <div style={styles.centrat}>
-                <div style={{textAlign:'center', color:'#aaa'}}>
-                  <div style={{fontSize:'48px', marginBottom:'12px'}}>🌱</div>
-                  <div>Selecciona un planter o crea'n un de nou</div>
-                </div>
-              </div>
-            )}
-            {cellaMobilInfo && (
-                  <div style={{
-                    position:'absolute', bottom:0, left:0, right:0,
-                    background:'white', borderTop:'1px solid #eee',
-                    borderRadius:'16px 16px 0 0',
-                    padding:'12px 16px 8px',
-                    boxShadow:'0 -4px 20px rgba(0,0,0,0.1)',
-                    zIndex:10,
-                  }}>
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
-                      <div>
-                        <div style={{fontSize:'13px', fontWeight:'600', color:'#333', marginBottom:'4px'}}>
-                          Cel·la {cellaMobilInfo.fila},{cellaMobilInfo.columna}
-                        </div>
-                        {cellaMobilInfo.cultius?.nom && (
-                          <div style={{display:'flex', alignItems:'center', gap:'6px', marginBottom:'2px'}}>
-                            <div style={{width:'10px', height:'10px', borderRadius:'2px', background:cellaMobilInfo.cultius?.color||'#ddd'}}/>
-                            <span style={{fontSize:'13px', color:'#333', fontWeight:'500'}}>{cellaMobilInfo.cultius.nom}</span>
-                            {cellaMobilInfo.varietats?.nom && cellaMobilInfo.varietats.nom !== '-' && (
-                              <span style={{fontSize:'12px', color:'#888'}}>· {cellaMobilInfo.varietats.nom}</span>
-                            )}
-                          </div>
-                        )}
-                        {cellaMobilInfo.data_sembra && (
-                          <div style={{fontSize:'11px', color:'#aaa'}}>
-                            Sembrat: {new Date(cellaMobilInfo.data_sembra).toLocaleDateString('ca-ES')}
-                          </div>
-                        )}
-                        {cellaMobilInfo.notes && (
-                          <div style={{fontSize:'12px', color:'#666', marginTop:'4px'}}>💬 {cellaMobilInfo.notes}</div>
-                        )}
-                      </div>
-                      <button style={{background:'none', border:'none', fontSize:'18px', color:'#aaa', cursor:'pointer'}}
-                        onClick={() => setCellaMobilInfo(null)}>✕</button>
-                    </div>
-                  </div>
-                )}
+          {/* Llegenda */}
+          <div style={{display:'flex', gap:'12px', padding:'8px 12px', borderTop:'1px solid #eee', flexShrink:0}}>
+            <div style={{display:'flex', alignItems:'center', gap:'4px', fontSize:'11px', color:'#666'}}>
+              <div style={{width:'12px', height:'12px', borderRadius:'2px', background:'white', border:'1px solid #ddd'}}/> Buida
+            </div>
+            <div style={{display:'flex', alignItems:'center', gap:'4px', fontSize:'11px', color:'#666'}}>
+              <div style={{width:'12px', height:'12px', borderRadius:'2px', background:'#ccc'}}/> No usada
+            </div>
+            <div style={{display:'flex', alignItems:'center', gap:'4px', fontSize:'11px', color:'#666'}}>
+              <div style={{width:'12px', height:'12px', borderRadius:'2px', background:'#C0DD97'}}/> Sembrada
+            </div>
           </div>
 
-          {/* Panell edició cel·la */}
-          {(cellaSeleccionada || cellesSeleccionades.length > 0) && (
-            <div style={styles.panell}>
-              <div style={styles.panellTitol}>
-                {cellesSeleccionades.length > 1
-                  ? `${cellesSeleccionades.length} cel·les seleccionades`
-                  : `Cel·la ${cellaSeleccionada.fila},${cellaSeleccionada.columna}`}
-              </div>
-              {cellesSeleccionades.length > 1 && (
-                <div style={{fontSize:'11px', color:'#888', marginBottom:'10px'}}>
-                  Els canvis s'aplicaran a totes les cel·les seleccionades
-                </div>
-              )}
-
-              <div style={styles.grup}>
-                <label style={styles.label}>Estat</label>
-                <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
-                  {[
-                    {val:'buida', label:'Buida', icon:'○'},
-                    {val:'x', label:'No usada', icon:'✕'},
-                    {val:'sembrada', label:'Sembrada', icon:'🌱'},
-                  ].map(o => (
-                    <div key={o.val}
-                      style={{...styles.opcio, ...(cellaEstat===o.val?styles.opcioActiva:{})}}
-                      onClick={() => setCellaEstat(o.val)}>
-                      {o.icon} {o.label}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {cellaEstat === 'sembrada' && (
-                <>
-                  <div style={styles.grup}>
-                    <label style={styles.label}>Data sembra</label>
-                    <input type="date" style={styles.input} value={cellaData}
-                      onChange={e => setCellaData(e.target.value)}/>
+          {/* Banda inferior info cel·la mòbil */}
+          {cellaMobilInfo && !mostrarPanellMovil && (
+            <div style={{position:'absolute', bottom:0, left:0, right:0, background:'white', borderTop:'1px solid #eee', borderRadius:'16px 16px 0 0', padding:'12px 16px', boxShadow:'0 -4px 20px rgba(0,0,0,0.1)'}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                <div>
+                  <div style={{fontSize:'13px', fontWeight:'600', color:'#333', marginBottom:'4px'}}>
+                    Cel·la {cellaMobilInfo.fila},{cellaMobilInfo.columna}
                   </div>
-                  <div style={styles.grup}>
-                    <label style={styles.label}>Cultiu</label>
-                    <select style={styles.input} value={cellaCultiuId}
-                      onChange={e => setCellaCultiuId(e.target.value)}>
-                      <option value="">— cap —</option>
-                      {cultius.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
-                    </select>
-                  </div>
-                  {varietats.length > 0 && (
-                    <div style={styles.grup}>
-                      <label style={styles.label}>Varietat</label>
-                      <select style={styles.input} value={cellaVarietatId}
-                        onChange={e => setCellaVarietatId(e.target.value)}>
-                        <option value="">— cap —</option>
-                        {varietats.map(v => <option key={v.id} value={v.id}>{v.nom}</option>)}
-                      </select>
+                  {cellaMobilInfo.cultius?.nom && (
+                    <div style={{display:'flex', alignItems:'center', gap:'6px'}}>
+                      <div style={{width:'10px', height:'10px', borderRadius:'2px', background:cellaMobilInfo.cultius?.color||'#ddd'}}/>
+                      <span style={{fontSize:'13px', fontWeight:'500'}}>{cellaMobilInfo.cultius.nom}</span>
+                      {cellaMobilInfo.varietats?.nom && cellaMobilInfo.varietats.nom !== '-' && (
+                        <span style={{fontSize:'12px', color:'#888'}}>· {cellaMobilInfo.varietats.nom}</span>
+                      )}
                     </div>
                   )}
-                </>
-              )}
-
-              <div style={styles.grup}>
-                <label style={styles.label}>Notes</label>
-                <textarea style={{...styles.input, height:'60px', resize:'vertical'}}
-                  value={cellaNotes} onChange={e => setCellaNotes(e.target.value)}/>
-              </div>
-
-             <div style={{marginTop:'auto', paddingTop:'12px', display:'flex', flexDirection:'column', gap:'6px'}}>
-                <button style={styles.botoPrimari} onClick={guardarCella} disabled={guardant}>
-                  {guardant ? 'Guardant...' : '💾 Guardar'}
-                </button>
-                <button style={styles.botoCancel} onClick={() => { setCellaSeleccionada(null); setCellesSeleccionades([]) }}>
-                  Cancel·lar
-                </button>
+                  {cellaMobilInfo.data_sembra && <div style={{fontSize:'11px', color:'#aaa', marginTop:'2px'}}>{new Date(cellaMobilInfo.data_sembra).toLocaleDateString('ca-ES')}</div>}
+                  {cellaMobilInfo.notes && <div style={{fontSize:'12px', color:'#666', marginTop:'4px'}}>💬 {cellaMobilInfo.notes}</div>}
+                </div>
+                <div style={{display:'flex', gap:'8px'}}>
+                  <button style={{padding:'6px 12px', background:'#1D9E75', color:'white', border:'none', borderRadius:'8px', fontSize:'12px', cursor:'pointer'}}
+                    onClick={() => setMostrarPanellMovil(true)}>
+                    Editar
+                  </button>
+                  <button style={{background:'none', border:'none', fontSize:'18px', color:'#aaa', cursor:'pointer'}}
+                    onClick={() => { setCellaMobilInfo(null); setCellaSeleccionada(null); setCellesSeleccionades([]) }}>✕</button>
+                </div>
               </div>
             </div>
           )}
         </div>
+      )}
 
-        {/* Modal nou planter */}
-        {mostrarNouPlanter && (
-          <div style={styles.modalNou}>
-            <div style={styles.modalNouCos}>
-              <div style={styles.modalNouTitol}>Nou planter</div>
-              <div style={styles.grup}>
-                <label style={styles.label}>Nom (opcional)</label>
-                <input style={styles.input} value={nouNom}
-                  onChange={e => setNouNom(e.target.value)}
-                  placeholder={`Planter ${new Date().toLocaleDateString('ca-ES')}`}/>
-              </div>
-              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px'}}>
-                <div style={styles.grup}>
-                  <label style={styles.label}>Files</label>
-                  <input type="number" style={styles.input} value={nouFiles} min="1" max="20"
-                    onChange={e => setNouFiles(parseInt(e.target.value)||1)}/>
-                </div>
-                <div style={styles.grup}>
-                  <label style={styles.label}>Columnes</label>
-                  <input type="number" style={styles.input} value={nouColumnes} min="1" max="30"
-                    onChange={e => setNouColumnes(parseInt(e.target.value)||1)}/>
-                </div>
-              </div>
-              <div style={styles.grup}>
-                <label style={styles.label}>Ubicació</label>
-                <select style={styles.input} value={nouUbicacio}
-                  onChange={e => setNouUbicacio(e.target.value)}>
-                  <option value="Casa">Casa</option>
-                  <option value="All">All</option>
-                  <option value="Begues">Begues</option>
-                  <option value="Estoll">Estoll</option>
-                  <option value="Alp">Alp</option>
-                  <option value="Altre">Altre</option>
-                </select>
-              </div>
-              <div style={{background:'#f0f9f5', border:'1px solid #b5e0d0', borderRadius:'8px', padding:'10px', fontSize:'12px', color:'#555', marginBottom:'12px'}}>
-                Es crearà una graella de {nouFiles}×{nouColumnes} = {nouFiles*nouColumnes} cel·les
-              </div>
+      {/* Panell edició cel·la mòbil — full screen */}
+      {mostrarPanellMovil && (cellaSeleccionada || cellesSeleccionades.length > 0) && (
+        <div style={{position:'absolute', inset:0, background:'white', display:'flex', flexDirection:'column', zIndex:10}}>
+          <div style={{background:'#1D9E75', padding:'12px 16px', display:'flex', alignItems:'center', gap:'12px', flexShrink:0}}>
+            <button style={{background:'none', border:'none', color:'white', fontSize:'20px', cursor:'pointer'}}
+              onClick={() => { setMostrarPanellMovil(false) }}>←</button>
+            <div style={{color:'white', fontWeight:'600', fontSize:'15px'}}>
+              {cellesSeleccionades.length > 1 ? `${cellesSeleccionades.length} cel·les` : `Cel·la ${cellaSeleccionada?.fila},${cellaSeleccionada?.columna}`}
+            </div>
+          </div>
+          <div style={{flex:1, overflowY:'auto', padding:'16px'}}>
+            <div style={{marginBottom:'12px'}}>
+              <label style={{display:'block', fontSize:'11px', color:'#888', marginBottom:'6px'}}>Estat</label>
               <div style={{display:'flex', gap:'8px'}}>
-                <button style={styles.botoPrimari} onClick={crearPlanter} disabled={guardant}>
-                  {guardant ? 'Creant...' : 'Crear planter'}
-                </button>
-                <button style={styles.botoCancel} onClick={() => setMostrarNouPlanter(false)}>
-                  Cancel·lar
-                </button>
+                {[{val:'buida',label:'Buida',icon:'○'},{val:'x',label:'No usada',icon:'✕'},{val:'sembrada',label:'Sembrada',icon:'🌱'}].map(o => (
+                  <div key={o.val}
+                    style={{flex:1, padding:'10px 6px', border:'1px solid #ddd', borderRadius:'8px', textAlign:'center', cursor:'pointer', fontSize:'13px',
+                      ...(cellaEstat===o.val?{background:'#E1F5EE', borderColor:'#1D9E75', color:'#0F6E56', fontWeight:'500'}:{color:'#333'})}}
+                    onClick={() => setCellaEstat(o.val)}>
+                    <div style={{fontSize:'18px'}}>{o.icon}</div>
+                    {o.label}
+                  </div>
+                ))}
               </div>
             </div>
-          </div>
-        )}
-      {tooltipCella && (
-          <div style={{
-            position:'fixed', left: tooltipCella.x+12, top: tooltipCella.y-10,
-            background:'rgba(0,0,0,0.85)', color:'white',
-            padding:'8px 12px', borderRadius:'8px', fontSize:'12px',
-            pointerEvents:'none', zIndex:2000, maxWidth:'200px', lineHeight:'1.6',
-          }}>
-            <div style={{fontWeight:'600', marginBottom:'4px'}}>
-              Cel·la {tooltipCella.fila},{tooltipCella.columna}
+
+            {cellaEstat === 'sembrada' && (
+              <>
+                <div style={{marginBottom:'12px'}}>
+                  <label style={{display:'block', fontSize:'11px', color:'#888', marginBottom:'4px'}}>Data sembra</label>
+                  <input type="date" style={{width:'100%', padding:'10px', border:'1px solid #ddd', borderRadius:'8px', fontSize:'14px', boxSizing:'border-box'}}
+                    value={cellaData} onChange={e => setCellaData(e.target.value)}/>
+                </div>
+                <div style={{marginBottom:'12px'}}>
+                  <label style={{display:'block', fontSize:'11px', color:'#888', marginBottom:'4px'}}>Cultiu</label>
+                  <select style={{width:'100%', padding:'10px', border:'1px solid #ddd', borderRadius:'8px', fontSize:'14px', boxSizing:'border-box'}}
+                    value={cellaCultiuId} onChange={e => setCellaCultiuId(e.target.value)}>
+                    <option value="">— cap —</option>
+                    {cultius.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                  </select>
+                </div>
+                {varietats.length > 0 && (
+                  <div style={{marginBottom:'12px'}}>
+                    <label style={{display:'block', fontSize:'11px', color:'#888', marginBottom:'4px'}}>Varietat</label>
+                    <select style={{width:'100%', padding:'10px', border:'1px solid #ddd', borderRadius:'8px', fontSize:'14px', boxSizing:'border-box'}}
+                      value={cellaVarietatId} onChange={e => setCellaVarietatId(e.target.value)}>
+                      <option value="">— cap —</option>
+                      {varietats.map(v => <option key={v.id} value={v.id}>{v.nom}</option>)}
+                    </select>
+                  </div>
+                )}
+              </>
+            )}
+
+            <div style={{marginBottom:'12px'}}>
+              <label style={{display:'block', fontSize:'11px', color:'#888', marginBottom:'4px'}}>Notes</label>
+              <textarea style={{width:'100%', padding:'10px', border:'1px solid #ddd', borderRadius:'8px', fontSize:'14px', boxSizing:'border-box', height:'80px', resize:'none'}}
+                value={cellaNotes} onChange={e => setCellaNotes(e.target.value)}/>
             </div>
-            {tooltipCella.cultiu && <div>{tooltipCella.cultiu}{tooltipCella.varietat ? ` · ${tooltipCella.varietat}` : ''}</div>}
-            {tooltipCella.data && <div style={{color:'#aaa', fontSize:'11px'}}>{new Date(tooltipCella.data).toLocaleDateString('ca-ES')}</div>}
-            {tooltipCella.notes && <div style={{color:'#ccc', fontSize:'11px', marginTop:'4px'}}>💬 {tooltipCella.notes}</div>}
           </div>
-        )}
-      </div>
+          <div style={{padding:'16px', borderTop:'1px solid #eee', display:'flex', gap:'10px'}}>
+            <button style={{flex:1, padding:'14px', background:'#1D9E75', color:'white', border:'none', borderRadius:'10px', fontSize:'15px', fontWeight:'600', cursor:'pointer'}}
+              onClick={() => { guardarCella(); setMostrarPanellMovil(false) }} disabled={guardant}>
+              {guardant ? 'Guardant...' : '💾 Guardar'}
+            </button>
+            <button style={{padding:'14px 20px', background:'white', color:'#666', border:'1px solid #ddd', borderRadius:'10px', fontSize:'15px', cursor:'pointer'}}
+              onClick={() => { setMostrarPanellMovil(false); setCellaSeleccionada(null); setCellesSeleccionades([]) }}>
+              Cancel·lar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal nou planter */}
+      {mostrarNouPlanter && (
+        <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'flex-end', zIndex:2000}}>
+          <div style={{background:'white', width:'100%', borderRadius:'16px 16px 0 0', padding:'20px', maxHeight:'80vh', overflowY:'auto'}}>
+            <div style={{fontSize:'16px', fontWeight:'600', color:'#333', marginBottom:'16px'}}>Nou planter</div>
+            <div style={{marginBottom:'12px'}}>
+              <label style={{display:'block', fontSize:'11px', color:'#888', marginBottom:'4px'}}>Nom (opcional)</label>
+              <input style={{width:'100%', padding:'10px', border:'1px solid #ddd', borderRadius:'8px', fontSize:'14px', boxSizing:'border-box'}}
+                value={nouNom} onChange={e => setNouNom(e.target.value)} placeholder={`Planter ${new Date().toLocaleDateString('ca-ES')}`}/>
+            </div>
+            <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'12px'}}>
+              <div>
+                <label style={{display:'block', fontSize:'11px', color:'#888', marginBottom:'4px'}}>Files</label>
+                <input type="number" style={{width:'100%', padding:'10px', border:'1px solid #ddd', borderRadius:'8px', fontSize:'14px', boxSizing:'border-box'}}
+                  value={nouFiles} min="1" max="20" onChange={e => setNouFiles(parseInt(e.target.value)||1)}/>
+              </div>
+              <div>
+                <label style={{display:'block', fontSize:'11px', color:'#888', marginBottom:'4px'}}>Columnes</label>
+                <input type="number" style={{width:'100%', padding:'10px', border:'1px solid #ddd', borderRadius:'8px', fontSize:'14px', boxSizing:'border-box'}}
+                  value={nouColumnes} min="1" max="30" onChange={e => setNouColumnes(parseInt(e.target.value)||1)}/>
+              </div>
+            </div>
+            <div style={{marginBottom:'12px'}}>
+              <label style={{display:'block', fontSize:'11px', color:'#888', marginBottom:'4px'}}>Ubicació</label>
+              <select style={{width:'100%', padding:'10px', border:'1px solid #ddd', borderRadius:'8px', fontSize:'14px', boxSizing:'border-box'}}
+                value={nouUbicacio} onChange={e => setNouUbicacio(e.target.value)}>
+                <option value="Casa">Casa</option>
+                <option value="All">All</option>
+                <option value="Begues">Begues</option>
+                <option value="Estoll">Estoll</option>
+                <option value="Alp">Alp</option>
+                <option value="Altre">Altre</option>
+              </select>
+            </div>
+            <div style={{background:'#f0f9f5', border:'1px solid #b5e0d0', borderRadius:'8px', padding:'10px', fontSize:'12px', color:'#555', marginBottom:'16px'}}>
+              Graella de {nouFiles}×{nouColumnes} = {nouFiles*nouColumnes} cel·les
+            </div>
+            <div style={{display:'flex', gap:'10px'}}>
+              <button style={{flex:1, padding:'14px', background:'#1D9E75', color:'white', border:'none', borderRadius:'10px', fontSize:'15px', fontWeight:'600', cursor:'pointer'}}
+                onClick={crearPlanter} disabled={guardant}>
+                {guardant ? 'Creant...' : 'Crear planter'}
+              </button>
+              <button style={{padding:'14px 20px', background:'white', color:'#666', border:'1px solid #ddd', borderRadius:'10px', fontSize:'15px', cursor:'pointer'}}
+                onClick={() => setMostrarNouPlanter(false)}>
+                Cancel·lar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
