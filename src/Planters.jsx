@@ -11,6 +11,8 @@ export default function Planters({ onTancar }) {
   const [cellaSeleccionada, setCellaSeleccionada] = useState(null)
   const [mostrarNouPlanter, setMostrarNouPlanter] = useState(false)
   const [guardant, setGuardant] = useState(false)
+  const [tooltipCella, setTooltipCella] = useState(null)
+  const [cellaMobilInfo, setCellaMobilInfo] = useState(null)
   
 
   // Nou planter
@@ -116,13 +118,18 @@ export default function Planters({ onTancar }) {
       if (jaHi) return prev.filter(c => c.id !== cella.id)
       return [...prev, cella]
     })
-    // Si és la primera seleccionada, carregar els seus valors al panell
     setCellaSeleccionada(cella)
     setCellaEstat(cella.estat)
     setCellaCultiuId(cella.cultiu_id?.toString() || '')
     setCellaVarietatId(cella.varietat_id?.toString() || '')
     setCellaData(cella.data_sembra || new Date().toISOString().split('T')[0])
     setCellaNotes(cella.notes || '')
+    // Info mòbil
+    if (cella.estat === 'sembrada') {
+      setCellaMobilInfo(cella)
+    } else {
+      setCellaMobilInfo(null)
+    }
   }
 
   function colorCella(cella) {
@@ -197,8 +204,21 @@ export default function Planters({ onTancar }) {
             {planterActiu ? (
               <div style={{display:'flex', flexDirection:'column', height:'100%'}}>
                 <div style={styles.planterHeader}>
-                  <div>
-                    <div style={styles.planterTitol}>{planterActiu.nom}</div>
+                  <div style={{flex:1}}>
+                    <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                      <input
+                        style={{fontSize:'15px', fontWeight:'600', color:'#333', border:'none', borderBottom:'1px solid transparent', background:'transparent', padding:'2px 4px', borderRadius:'4px', flex:1}}
+                        value={planterActiu.nom}
+                        onChange={async e => {
+                          const nouNom = e.target.value
+                          setPlanterActiu(prev => ({...prev, nom: nouNom}))
+                          setPlanters(prev => prev.map(p => p.id === planterActiu.id ? {...p, nom: nouNom} : p))
+                          await supabase.from('planters').update({ nom: nouNom }).eq('id', planterActiu.id)
+                        }}
+                        onFocus={e => e.target.style.borderBottomColor='#1D9E75'}
+                        onBlur={e => e.target.style.borderBottomColor='transparent'}
+                      />
+                    </div>
                     <div style={styles.planterSubtitol}>
                       {planterActiu.files}×{planterActiu.columnes} cel·les · {planterActiu.ubicacio}
                       {planterActiu.estat === 'gastat' && <span style={styles.badgeGastat}>Gastat</span>}
@@ -227,8 +247,20 @@ export default function Planters({ onTancar }) {
                       const estaSembrada = cella?.estat === 'sembrada'
                       return (
                         <div key={`${fi}-${ci}`}
-                          onClick={() => cella && toggleCella(cella)}
-                          style={{
+                            onClick={() => cella && toggleCella(cella)}
+                            onMouseEnter={e => {
+                              if (!cella || cella.estat === 'buida' || cella.estat === 'x') return
+                              setTooltipCella({
+                                x: e.clientX, y: e.clientY,
+                                cultiu: cella.cultius?.nom,
+                                varietat: cella.varietats?.nom && cella.varietats.nom !== '-' ? cella.varietats.nom : null,
+                                data: cella.data_sembra,
+                                notes: cella.notes,
+                                fila: cella.fila, columna: cella.columna,
+                              })
+                            }}
+                            onMouseLeave={() => setTooltipCella(null)}
+                            style={{
                             aspectRatio: '1',
                             background: estaX ? '#ccc' : estaSembrada ? (cella.cultius?.color || '#C0DD97') : 'white',
                             border: seleccionada ? '2px solid #1D9E75' : '1px solid #ddd',
@@ -280,6 +312,43 @@ export default function Planters({ onTancar }) {
                 </div>
               </div>
             )}
+            {cellaMobilInfo && (
+                  <div style={{
+                    position:'absolute', bottom:0, left:0, right:0,
+                    background:'white', borderTop:'1px solid #eee',
+                    borderRadius:'16px 16px 0 0',
+                    padding:'12px 16px 8px',
+                    boxShadow:'0 -4px 20px rgba(0,0,0,0.1)',
+                    zIndex:10,
+                  }}>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start'}}>
+                      <div>
+                        <div style={{fontSize:'13px', fontWeight:'600', color:'#333', marginBottom:'4px'}}>
+                          Cel·la {cellaMobilInfo.fila},{cellaMobilInfo.columna}
+                        </div>
+                        {cellaMobilInfo.cultius?.nom && (
+                          <div style={{display:'flex', alignItems:'center', gap:'6px', marginBottom:'2px'}}>
+                            <div style={{width:'10px', height:'10px', borderRadius:'2px', background:cellaMobilInfo.cultius?.color||'#ddd'}}/>
+                            <span style={{fontSize:'13px', color:'#333', fontWeight:'500'}}>{cellaMobilInfo.cultius.nom}</span>
+                            {cellaMobilInfo.varietats?.nom && cellaMobilInfo.varietats.nom !== '-' && (
+                              <span style={{fontSize:'12px', color:'#888'}}>· {cellaMobilInfo.varietats.nom}</span>
+                            )}
+                          </div>
+                        )}
+                        {cellaMobilInfo.data_sembra && (
+                          <div style={{fontSize:'11px', color:'#aaa'}}>
+                            Sembrat: {new Date(cellaMobilInfo.data_sembra).toLocaleDateString('ca-ES')}
+                          </div>
+                        )}
+                        {cellaMobilInfo.notes && (
+                          <div style={{fontSize:'12px', color:'#666', marginTop:'4px'}}>💬 {cellaMobilInfo.notes}</div>
+                        )}
+                      </div>
+                      <button style={{background:'none', border:'none', fontSize:'18px', color:'#aaa', cursor:'pointer'}}
+                        onClick={() => setCellaMobilInfo(null)}>✕</button>
+                    </div>
+                  </div>
+                )}
           </div>
 
           {/* Panell edició cel·la */}
@@ -406,6 +475,21 @@ export default function Planters({ onTancar }) {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+      {tooltipCella && (
+          <div style={{
+            position:'fixed', left: tooltipCella.x+12, top: tooltipCella.y-10,
+            background:'rgba(0,0,0,0.85)', color:'white',
+            padding:'8px 12px', borderRadius:'8px', fontSize:'12px',
+            pointerEvents:'none', zIndex:2000, maxWidth:'200px', lineHeight:'1.6',
+          }}>
+            <div style={{fontWeight:'600', marginBottom:'4px'}}>
+              Cel·la {tooltipCella.fila},{tooltipCella.columna}
+            </div>
+            {tooltipCella.cultiu && <div>{tooltipCella.cultiu}{tooltipCella.varietat ? ` · ${tooltipCella.varietat}` : ''}</div>}
+            {tooltipCella.data && <div style={{color:'#aaa', fontSize:'11px'}}>{new Date(tooltipCella.data).toLocaleDateString('ca-ES')}</div>}
+            {tooltipCella.notes && <div style={{color:'#ccc', fontSize:'11px', marginTop:'4px'}}>💬 {tooltipCella.notes}</div>}
           </div>
         )}
       </div>
