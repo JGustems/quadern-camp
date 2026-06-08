@@ -154,9 +154,7 @@ export default function Planters({ onTancar }) {
   const plantersActius = planters.filter(p => p.estat === 'actiu')
   const plantersGastats = planters.filter(p => p.estat === 'gastat')
 
-  const esMobil = window.innerWidth < 768
-  const [vistaMovil, setVistaMovil] = useState('llista') // 'llista' | 'graella'
-  const [mostrarPanellMovil, setMostrarPanellMovil] = useState(false)
+
 
   if (esMobil) return (
     <div style={{position:'fixed', inset:0, background:'white', display:'flex', flexDirection:'column', zIndex:1000}}>
