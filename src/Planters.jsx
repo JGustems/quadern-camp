@@ -9,6 +9,9 @@ export default function Planters({ onTancar }) {
   const [varietats, setVarietats] = useState([])
   const [vistaActiva, setVistaActiva] = useState('llista')
   const [cellaSeleccionada, setCellaSeleccionada] = useState(null)
+  const esMobil = window.innerWidth < 768
+  const [vistaMovil, setVistaMovil] = useState('llista')
+  const [mostrarPanellMovil, setMostrarPanellMovil] = useState(false)
   const [mostrarNouPlanter, setMostrarNouPlanter] = useState(false)
   const [guardant, setGuardant] = useState(false)
   const [tooltipCella, setTooltipCella] = useState(null)
