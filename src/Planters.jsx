@@ -140,7 +140,7 @@ export default function Planters({ onTancar }) {
             const estaSembrada = cella?.estat === 'sembrada'
             return (
               <div key={`${fi}-${ci}`}
-                onClick={() => { if(cella) { toggleCella(cella); if(esMobil) setMostrarPanellMovil(true) } }}
+                onClick={() => { if(cella) { toggleCella(cella) } }}
                 onMouseEnter={e => {
                   if (esMobil || !cella || cella.estat==='buida' || cella.estat==='x') return
                   setTooltipCella({ x:e.clientX, y:e.clientY, cultiu:cella.cultius?.nom,
