@@ -498,19 +498,47 @@ function trobarPuntProper(x, y) {
 
   async function eliminarZonesSeleccionades() {
     const ambRegistres = []
+    const senseRegistres = []
+
     for (const zona of zonesSeleccionades) {
       if (zona.id) {
         const { count } = await supabase
           .from('registres')
           .select('id', { count: 'exact', head: true })
           .eq('zona_id', zona.id)
-        if (count > 0) ambRegistres.push(`${zona.nom||zona.codi} (${count} registres)`)
+        if (count > 0) ambRegistres.push(zona)
+        else senseRegistres.push(zona)
+      } else {
+        // Zona nova sense ID — eliminar directament
+        senseRegistres.push(zona)
       }
     }
+
+    // Zones amb registres → desactivar
     if (ambRegistres.length > 0) {
-      afegirMissatge(`No es poden eliminar zones amb registres: ${ambRegistres.join(', ')}`, 'error')
-      return
+      const noms = ambRegistres.map(z => z.nom||z.codi).join(', ')
+      if (window.confirm(`Les zones ${noms} tenen registres i no es poden eliminar. Vols desactivar-les? Deixaran de apareixer al mapa però els registres es mantindran.`)) {
+        for (const zona of ambRegistres) {
+          await supabase.from('zones').update({ activa: false }).eq('id', zona.id)
+        }
+        afegirMissatge(`${ambRegistres.length} zona(es) desactivada(es)`, 'ok')
+      }
     }
+
+    // Zones sense registres → eliminar
+    if (senseRegistres.length > 0) {
+      const idsExistents = senseRegistres.filter(z => z.id).map(z => z.id)
+      const tempIds = senseRegistres.filter(z => !z.id && z.tempId).map(z => z.tempId)
+
+      if (idsExistents.length) {
+        setZonesAEliminar(prev => [...prev, ...idsExistents])
+      }
+      setZones(prev => prev.filter(z => !tempIds.includes(z.tempId)))
+      afegirMissatge(`${senseRegistres.length} zona(es) eliminada(es)`, 'ok')
+    }
+
+    setZonesSeleccionades([])
+  }
     const idsExistents = zonesSeleccionades.filter(z => z.id).map(z => z.id)
 const tempIdsNoves = zonesSeleccionades.filter(z => !z.id && z.tempId).map(z => z.tempId)
 
