@@ -41,10 +41,14 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
   const [plujaPrevisio, setPlujaPrevisio] = useState(null)
   const [carregantTemps, setCarregantTemps] = useState(false)
   const [guardant, setGuardant] = useState(false)  // ✅ CORRECTE
+  const [planters, setPlanters] = useState([])
+  const [planterSeleccionat, setPlanterSeleccionat] = useState(null)
 
   const tascaSeleccionada = tasques.find(t => t.id === parseInt(tascaId))
   const mostrarCultiu = ['Plantar','Sembrar','Zona permanent'].includes(tascaSeleccionada?.nom)
   const esNetejar = tascaSeleccionada?.nom === 'Netejar'
+  const subtascaSeleccionada = subtasques.find(s => s.id === parseInt(subtascaId))
+  const esPlanterPropi = subtascaSeleccionada?.nom?.toLowerCase().includes('planter propi')
 
   // Cultius actius a les zones seleccionades
   const cultiusActiusZones = () => {
@@ -70,14 +74,16 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
   useEffect(() => { if (data) carregaTemps(data) }, [data])
 
   async function carregaDades() {
-    const [t, c, u] = await Promise.all([
+    const [t, c, u, p] = await Promise.all([
       supabase.from('tasques').select('*').order('nom'),
       supabase.from('cultius').select('*').order('nom'),
       supabase.from('usuaris').select('*').order('nom'),
+      supabase.from('planters').select('*').eq('estat', 'actiu').order('created_at', { ascending: false }),
     ])
     setTasques(t.data || [])
     setCultius(c.data || [])
     setUsuaris(u.data || [])
+    setPlanters(p.data || [])
   }
 
   async function carregaSubtasques(tId) {
@@ -182,6 +188,7 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
     const registres = zones.map(zona => ({
       zona_id: zona.id,
       tasca_grup_id: grupId,
+      planter_id: planterSeleccionat?.id || null,
       cultiu_id: cultiuIdFinal,
       varietat_id: varietatIdFinal,
       tasca_id: parseInt(tascaId),
@@ -289,6 +296,28 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
                 <option value="">— cap —</option>
                 {subtasques.map(s => <option key={s.id} value={s.id}>{s.nom}</option>)}
               </select>
+            </div>
+          )}
+          {esPlanterPropi && planters.length > 0 && (
+            <div style={styles.grup}>
+              <label style={styles.etiqueta}>Planter d'origen</label>
+              <select style={styles.input} value={planterSeleccionat?.id || ''}
+                onChange={e => {
+                  const p = planters.find(p => p.id === parseInt(e.target.value))
+                  setPlanterSeleccionat(p || null)
+                }}>
+                <option value="">— selecciona planter —</option>
+                {planters.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.nom} · {p.files}×{p.columnes} · {p.ubicacio}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {esPlanterPropi && planters.length === 0 && (
+            <div style={{background:'#FEF9C3', border:'1px solid #FDE68A', borderRadius:'8px', padding:'10px', fontSize:'12px', color:'#854D0E', marginBottom:'12px'}}>
+              No hi ha planters actius. Crea un planter primer.
             </div>
           )}
 
