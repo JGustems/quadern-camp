@@ -379,7 +379,7 @@ export default function MapaCamp({ camp, zones, zonesSeleccionades, onToggleZona
         )}
 
         {/* Zones d'arbres/cultius */}
-        {[...zones].sort((a,b) => (a.ordre||0)-(b.ordre||0)).map(zona => {
+        {[...zones].filter(z => z.activa !== false).sort((a,b) => (a.ordre||0)-(b.ordre||0)).map(zona => {
           const pts = getPts(zona)
           if (!pts?.length) return null
           const sel = zonesSeleccionades.some(z => z?.id === zona?.id)
