@@ -539,20 +539,7 @@ function trobarPuntProper(x, y) {
 
     setZonesSeleccionades([])
   }
-    const idsExistents = zonesSeleccionades.filter(z => z.id).map(z => z.id)
-const tempIdsNoves = zonesSeleccionades.filter(z => !z.id && z.tempId).map(z => z.tempId)
-
-// Zones existents a la BD: marcar per eliminar
-if (idsExistents.length) setZonesAEliminar(prev => [...prev, ...idsExistents])
-
-// Zones noves (tempId): eliminar directament de l'estat
-setZones(prev => prev.filter(z => !tempIdsNoves.includes(z.tempId)))
-
-// Treure totes de la vista
-setZones(prev => prev.filter(z => !idsExistents.includes(z.id)))
-    setZonesSeleccionades([])
-    afegirMissatge(`${idsAEliminar.length} zona(es) eliminada(es)`, 'ok')
-  }
+    
 function moureZona(direccio) {
     if (zonesSeleccionades.length !== 1) return
     const zona = zonesSeleccionades[0]
