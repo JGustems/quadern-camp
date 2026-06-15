@@ -509,35 +509,48 @@ function trobarPuntProper(x, y) {
         if (count > 0) ambRegistres.push(zona)
         else senseRegistres.push(zona)
       } else {
-        // Zona nova sense ID — eliminar directament
         senseRegistres.push(zona)
       }
     }
 
-    // Zones amb registres → desactivar
     if (ambRegistres.length > 0) {
       const noms = ambRegistres.map(z => z.nom||z.codi).join(', ')
-      if (window.confirm(`Les zones ${noms} tenen registres i no es poden eliminar. Vols desactivar-les? Deixaran de apareixer al mapa però els registres es mantindran.`)) {
-        for (const zona of ambRegistres) {
-          await supabase.from('zones').update({ activa: false }).eq('id', zona.id)
-        }
-        afegirMissatge(`${ambRegistres.length} zona(es) desactivada(es)`, 'ok')
-      }
+      afegirMissatge(`Les zones ${noms} tenen registres i no es poden eliminar. Utilitza "Arxivar" per amagar-les mantenint l'historial.`, 'warn')
     }
 
-    // Zones sense registres → eliminar
     if (senseRegistres.length > 0) {
       const idsExistents = senseRegistres.filter(z => z.id).map(z => z.id)
       const tempIds = senseRegistres.filter(z => !z.id && z.tempId).map(z => z.tempId)
-
-      if (idsExistents.length) {
-        setZonesAEliminar(prev => [...prev, ...idsExistents])
-      }
+      if (idsExistents.length) setZonesAEliminar(prev => [...prev, ...idsExistents])
       setZones(prev => prev.filter(z => !tempIds.includes(z.tempId)))
       afegirMissatge(`${senseRegistres.length} zona(es) eliminada(es)`, 'ok')
     }
 
     setZonesSeleccionades([])
+  }
+
+  async function arxivarZonesSeleccionades() {
+    const zonesAmbId = zonesSeleccionades.filter(z => z.id)
+    if (!zonesAmbId.length) {
+      afegirMissatge('Només es poden arxivar zones ja guardades', 'warn')
+      return
+    }
+    for (const zona of zonesAmbId) {
+      await supabase.from('zones').update({ activa: false }).eq('id', zona.id)
+    }
+    // Actualitzar estat local
+    setZones(prev => prev.map(z => {
+      if (zonesAmbId.find(za => za.id === z.id)) return {...z, activa: false}
+      return z
+    }))
+    setZonesSeleccionades([])
+    afegirMissatge(`${zonesAmbId.length} zona(es) arxivada(es)`, 'ok')
+  }
+
+  async function reactivarZona(zona) {
+    await supabase.from('zones').update({ activa: true }).eq('id', zona.id)
+    setZones(prev => prev.map(z => z.id === zona.id ? {...z, activa: true} : z))
+    afegirMissatge(`Zona "${zona.nom||zona.codi}" reactivada`, 'ok')
   }
     
 function moureZona(direccio) {
@@ -829,9 +842,13 @@ function moureZona(direccio) {
                         </select>
                       </div>
                     )}
+                    <button style={{...styles.botoPrimari, background:'#e8a000', marginTop:'6px'}}
+                      onClick={arxivarZonesSeleccionades}>
+                      📦 Arxivar {zonesSeleccionades.length > 1 ? `${zonesSeleccionades.length} zones` : 'zona'}
+                    </button>
                     <button style={{...styles.botoPrimari, background:'#e55', marginTop:'6px'}}
                       onClick={eliminarZonesSeleccionades}>
-                      Eliminar {zonesSeleccionades.length > 1 ? `${zonesSeleccionades.length} zones` : 'zona'}
+                      🗑 Eliminar {zonesSeleccionades.length > 1 ? `${zonesSeleccionades.length} zones` : 'zona'}
                     </button>
                     <button style={{...styles.botoPrimari, background:'#888', marginTop:'6px'}}
                       onClick={() => {
@@ -889,7 +906,7 @@ function moureZona(direccio) {
 
                 <div style={{marginTop:'16px'}}>
                   <div style={styles.seccio}>
-                    Zones ({zones.filter(z => !estaEliminada(z)).length})
+                    Zones ({zones.filter(z => !estaEliminada(z) && z.activa !== false).length})
                     {zonesAEliminar.length > 0 && (
                       <span style={{color:'#e55', marginLeft:'6px'}}>
                         · {zonesAEliminar.length} per eliminar
@@ -897,7 +914,7 @@ function moureZona(direccio) {
                     )}
                   </div>
                   <div style={{maxHeight:'200px', overflowY:'auto'}}>
-                    {zones.filter(z => !estaEliminada(z)).map(z => (
+                   {zones.filter(z => !estaEliminada(z) && z.activa !== false).map(z => (
                       <div key={z.id||z.tempId}
                         onClick={() => {
                           setZonesSeleccionades([z])
@@ -921,6 +938,29 @@ function moureZona(direccio) {
                         </span>
                       </div>
                     ))}
+                    {zones.filter(z => z.activa === false && !estaEliminada(z)).length > 0 && (
+                    <div style={{marginTop:'12px'}}>
+                      <div style={{...styles.seccio, color:'#bbb'}}>
+                        Arxivades ({zones.filter(z => z.activa === false).length})
+                      </div>
+                      {zones.filter(z => z.activa === false && !estaEliminada(z)).map(z => (
+                        <div key={z.id||z.tempId}
+                          style={{display:'flex', alignItems:'center', gap:'6px', padding:'5px 6px',
+                            borderRadius:'5px', marginBottom:'2px', background:'#f8f8f8', opacity:0.7}}>
+                          <div style={{width:'10px',height:'10px',borderRadius:'2px',
+                            background:z.color||'#ddd', flexShrink:0, filter:'grayscale(1)'}}/>
+                          <span style={{fontSize:'12px', color:'#aaa', flex:1, textDecoration:'line-through'}}>
+                            {z.nom||z.codi}
+                          </span>
+                          <button
+                            onClick={() => reactivarZona(z)}
+                            style={{fontSize:'10px', color:'#1D9E75', background:'none', border:'none', cursor:'pointer', padding:'2px 4px'}}>
+                            ↩ Reactivar
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   </div>
                 </div>
               </div>
