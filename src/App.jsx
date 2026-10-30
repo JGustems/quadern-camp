@@ -190,82 +190,58 @@ async function carregaCultiusActius(zones, dataFiltrar = null) {
   try {
     const zonaIds = zones.map(z => z?.id).filter(Boolean)
     if (!zonaIds.length) return
-    
+
     let query = supabase
       .from('registres')
-      .select('zona_id, data, cultius(nom, color), varietats(nom), tasques(nom), cultiu_id, varietat_id')
+      .select('zona_id, data, cultiu_id, varietat_id, cultius(nom, color), varietats(nom), tasques(nom)')
       .in('zona_id', zonaIds)
       .order('data', { ascending: true })
       .order('id', { ascending: true })
-    
+
     if (dataFiltrar) query = query.lte('data', dataFiltrar)
-    
+
     const { data, error } = await query
     if (error) throw error
-    
-    const cultiusPerZona = {}
+
     const tasquesPlantacio = ['Plantar', 'Sembrar', 'Zona permanent']
+    const cultiusPerZona = {}
 
     zones.forEach(zona => {
       if (!zona?.id) return
-      const regsZona = (data || []).filter(r => r.zona_id === zona.id)
-      
-      // ✅ CANVI CLAU: Per cada cultiu+varietat, buscar el seu últim "Netejar"
-      const cultiusVists = new Map() // clau: `cultiu_id||varietat_id`
-      
-      regsZona.forEach(r => {
-        const clau = `${r.cultiu_id}||${r.varietat_id}`
-        
-        // Si ja hem vist aquest cultiu, saltarem
-        if (cultiusVists.has(clau)) return
-        
-        // Buscar la tasca de plantació més recent per a aquest cultiu
-        const plantacioDeAquestCultiu = regsZona.find(reg => {
-          if (!tasquesPlantacio.includes(reg.tasques?.nom)) return false
-          if (reg.cultiu_id !== r.cultiu_id || reg.varietat_id !== r.varietat_id) return false
-          return true
-        })
-        
-        if (!plantacioDeAquestCultiu) return
-        
-        // Buscar si hi ha un "Netejar" posterior per A AQUEST CULTIU ESPECÍFIC
-        const netejatDeAquestCultiu = regsZona.find(reg => {
-          if (reg.tasques?.nom !== 'Netejar') return false
-          if (reg.cultiu_id !== r.cultiu_id || reg.varietat_id !== r.varietat_id) return false
-          return true
-        })
-        
-        // Si el Netejar és posterior a la plantació, el cultiu NO està actiu
-        if (netejatDeAquestCultiu && new Date(netejatDeAquestCultiu.data) > new Date(plantacioDeAquestCultiu.data)) {
-          cultiusVists.set(clau, null) // Marcar com netejar
-          return
-        }
-        
-        // Si la plantació no ha estat netejar, afegir a la llista de cultius actius
-        if (plantacioDeAquestCultiu) {
-          cultiusVists.set(clau, {
-            nom: plantacioDeAquestCultiu.cultius?.nom,
-            color: plantacioDeAquestCultiu.cultius?.color,
-            varietat: plantacioDeAquestCultiu.varietats?.nom,
-          })
-        }
-      })
+      const actius = new Map() // clau: cultiu_id||varietat_id
 
-      // Recollir els cultius actius (excloent els null)
-      const cultiusActius = Array.from(cultiusVists.values()).filter(c => c !== null)
-      
-      if (cultiusActius.length > 0) {
-        const unicsPerNom = new Map()
-        cultiusActius.forEach(c => {
-          if (!unicsPerNom.has(c.nom)) {
-            unicsPerNom.set(c.nom, c)
+      ;(data || [])
+        .filter(r => r.zona_id === zona.id)
+        .forEach(r => {
+          const tasca = r.tasques?.nom
+          const clau = `${r.cultiu_id || ''}||${r.varietat_id || ''}`
+
+          if (tasquesPlantacio.includes(tasca) && r.cultius?.nom) {
+            actius.set(clau, {
+              nom: r.cultius.nom,
+              color: r.cultius.color,
+              varietat: r.varietats?.nom && r.varietats.nom !== '-' ? r.varietats.nom : null,
+              cultiu_id: r.cultiu_id,
+              varietat_id: r.varietat_id,
+            })
+          } else if (tasca === 'Netejar') {
+            if (r.cultiu_id) actius.delete(clau)
+            else actius.clear()
           }
         })
-        
-        cultiusPerZona[zona.id] = Array.from(unicsPerNom.values())
-        cultiusPerZona[zona.id].tots = cultiusActius
+
+      const tots = Array.from(actius.values())
+      if (tots.length > 0) {
+        const perColor = []
+        const vists = new Set()
+        tots.forEach(t => {
+          if (!vists.has(t.nom)) { vists.add(t.nom); perColor.push(t) }
+        })
+        cultiusPerZona[zona.id] = perColor
+        cultiusPerZona[zona.id].tots = tots
       }
     })
+
     setCultiusActius(cultiusPerZona)
   } catch (e) {
     console.error('Error carregant cultius:', e)
