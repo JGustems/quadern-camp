@@ -27,7 +27,7 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
   const [subtascaId, setSubtascaId] = useState('')
   const [cultiuId, setCultiuId] = useState('')
   const [varietatId, setVarietatId] = useState('')
-  const [cultiuAssignat, setCultiuAssignat] = useState(null) // cultiu actiu seleccionat
+  const [cultiusAssignats, setCultiusAssignats] = useState([])
   const [usuariId, setUsuariId] = useState('')
   const [quantitat, setQuantitat] = useState('')
   const [costMaObra, setCostMaObra] = useState('')
@@ -69,6 +69,7 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
   const teMulitplesCultius = cultiusActiusLlista.length > 1
 
   useEffect(() => { carregaDades() }, [])
+  useEffect(() => { setCultiusAssignats(cultiusActiusZones()) }, [])
   useEffect(() => { if (tascaId) carregaSubtasques(tascaId) }, [tascaId])
   useEffect(() => { if (cultiuId) carregaVarietats(cultiuId) }, [cultiuId])
   useEffect(() => { if (data) carregaTemps(data) }, [data])
@@ -165,40 +166,33 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
     const { data } = await supabase.from('varietats').select('id').eq('nom', nom).eq('cultiu_id', cultiuId).single()
     return data?.id || null
   }
+    const clauCultiu = c => `${c.nom}||${c.varietat || ''}`
+
   async function guardar() {
     if (!tascaId || zones.length === 0) return
-    // ✅ NOVA VALIDACIÓ: Si és "Netejar", obligatori seleccionar cultiu
-  if (esNetejar && !cultiuAssignat) {
-    alert('Has de seleccionar quin cultiu vols netejar')
-    return
-  }
+    if (teMulitplesCultius && !mostrarCultiu && cultiusAssignats.length === 0) {
+      alert('Marca almenys un cultiu')
+      return
+    }
     setGuardant(true)
 
+    const grupId = crypto.randomUUID()
     const lluna = faseLluna(data)
 
-    const grupId = crypto.randomUUID()
-    // Si hi ha cultiu assignat manualment (quan hi ha múltiples), usar-lo
-    const cultiuIdFinal = cultiuAssignat
-      ? await obtenirCultiuId(cultiuAssignat.nom)
-      : cultiuId ? parseInt(cultiuId) : null
-    const varietatIdFinal = cultiuAssignat?.varietat
-      ? await obtenirVarietatId(cultiuAssignat.varietat, cultiuIdFinal)
-      : varietatId ? parseInt(varietatId) : null
-
-    const registres = zones.map(zona => ({
+    const crea = (zona, cultiu_id, varietat_id, divisor = 1) => ({
       zona_id: zona.id,
       tasca_grup_id: grupId,
       planter_id: planterSeleccionat?.id || null,
-      cultiu_id: cultiuIdFinal,
-      varietat_id: varietatIdFinal,
+      cultiu_id,
+      varietat_id,
       tasca_id: parseInt(tascaId),
       subtasca_id: subtascaId ? parseInt(subtascaId) : null,
       usuari_id: usuariId ? parseInt(usuariId) : null,
       data,
       quantitat: quantitat ? parseFloat(quantitat) : null,
       unitat: tascaSeleccionada?.unitat || null,
-      cost_ma_obra: costMaObra ? parseFloat(costMaObra) : null,
-      cost_producte: costProducte ? parseFloat(costProducte) : null,
+      cost_ma_obra: costMaObra ? parseFloat(costMaObra) / divisor : null,
+      cost_producte: costProducte ? parseFloat(costProducte) / divisor : null,
       nom_producte: nomProducte || null,
       notes: notes || null,
       lluna,
@@ -207,10 +201,44 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
       temp_min: temps?.tmin || null,
       codi_temps: temps?.codi || null,
       pluja_prevista: plujaPrevisio ? parseFloat(plujaPrevisio) : null,
-    }))
+    })
 
-    await supabase.from('registres').insert(registres)
+    const registres = []
+
+    if (mostrarCultiu) {
+      // Plantar / Sembrar: cultiu triat al formulari
+      zones.forEach(zona => registres.push(
+        crea(zona, cultiuId ? parseInt(cultiuId) : null, varietatId ? parseInt(varietatId) : null)
+      ))
+    } else {
+      // Resta de tasques: un registre per cada cultiu marcat que sigui actiu a la zona
+      const seleccio = teMulitplesCultius ? cultiusAssignats : cultiusActiusLlista
+      zones.forEach(zona => {
+        const ca = cultiusActius?.[zona.id]
+        const actiusZona = ca?.tots || (Array.isArray(ca) ? ca : [])
+        if (actiusZona.length === 0) {
+          registres.push(crea(zona, null, null))
+          return
+        }
+        const elegits = actiusZona.filter(a => seleccio.some(s => clauCultiu(s) === clauCultiu(a)))
+        elegits.forEach(c => registres.push(
+          crea(zona, c.cultiu_id || null, c.varietat_id || null, elegits.length)
+        ))
+      })
+    }
+
+    if (registres.length === 0) {
+      alert('Cap de les zones seleccionades té els cultius marcats.')
+      setGuardant(false)
+      return
+    }
+
+    const { error } = await supabase.from('registres').insert(registres)
     setGuardant(false)
+    if (error) {
+      alert('Error en guardar: ' + error.message)
+      return
+    }
     onGuardat()
   }
 
@@ -256,30 +284,38 @@ export default function FormulariTasca({ zones, camp, cultiusActius, onTancar, o
 
           {/* Cultiu actiu — si n'hi ha múltiples, preguntar */}
           {/* Cultiu actiu — si n'hi ha múltiples, preguntar (SEMPRE per Netejar) */}
-{(teMulitplesCultius || esNetejar) && !mostrarCultiu && (
-  <div style={styles.grup}>
-    <label style={styles.etiqueta}>
-      {esNetejar ? 'Quin cultiu vols netejar?' : 'Assignar tasca a quin cultiu+varietat?'}
-    </label>
-    <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
-      {esNetejar ? null : (
-        <div
-          style={{...styles.cultiuOpcio, ...(cultiuAssignat===null?styles.cultiuOpcioActiu:{})}}
-          onClick={() => setCultiuAssignat(null)}>
-          Tots els cultius de la zona
-        </div>
-      )}
-      {cultiusActiusLlista.map((c, i) => (
-        <div key={i}
-          style={{...styles.cultiuOpcio, ...(cultiuAssignat===c?styles.cultiuOpcioActiu:{})}}
-          onClick={() => setCultiuAssignat(c)}>
-          <div style={{width:'12px',height:'12px',borderRadius:'3px',background:c.color||'#ddd',flexShrink:0}}/>
-          <span>{c.nom}{c.varietat ? ` · ${c.varietat}` : ''}</span>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+          {teMulitplesCultius && !mostrarCultiu && (
+            <div style={styles.grup}>
+              <label style={styles.etiqueta}>A quins cultius s'aplica la tasca?</label>
+              <div style={{display:'flex', gap:'6px', marginBottom:'8px'}}>
+                <button type="button" style={{...styles.botoSecundari, padding:'5px 10px', fontSize:'12px'}}
+                  onClick={() => setCultiusAssignats(cultiusActiusLlista)}>Marcar tots</button>
+                <button type="button" style={{...styles.botoSecundari, padding:'5px 10px', fontSize:'12px'}}
+                  onClick={() => setCultiusAssignats([])}>Desmarcar tots</button>
+              </div>
+              <div style={{display:'flex', flexDirection:'column', gap:'6px'}}>
+                {cultiusActiusLlista.map((c, i) => {
+                  const marcat = cultiusAssignats.some(a => clauCultiu(a) === clauCultiu(c))
+                  return (
+                    <div key={i}
+                      style={{...styles.cultiuOpcio, ...(marcat ? styles.cultiuOpcioActiu : {})}}
+                      onClick={() => setCultiusAssignats(prev =>
+                        marcat ? prev.filter(a => clauCultiu(a) !== clauCultiu(c)) : [...prev, c]
+                      )}>
+                      <div style={{
+                        width:'18px', height:'18px', borderRadius:'4px', flexShrink:0,
+                        border: marcat ? '2px solid #1D9E75' : '2px solid #ccc',
+                        background: marcat ? '#1D9E75' : 'white', color:'white',
+                        display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px'
+                      }}>{marcat ? '✓' : ''}</div>
+                      <div style={{width:'12px', height:'12px', borderRadius:'3px', background:c.color||'#ddd', flexShrink:0}}/>
+                      <span>{c.nom}{c.varietat ? ` · ${c.varietat}` : ''}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           <div style={styles.grup}>
             <label style={styles.etiqueta}>Tasca *</label>
