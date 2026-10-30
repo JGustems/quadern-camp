@@ -195,7 +195,8 @@ async function carregaCultiusActius(zones, dataFiltrar = null) {
       .from('registres')
       .select('zona_id, data, cultius(nom, color), varietats(nom), tasques(nom), cultiu_id, varietat_id')
       .in('zona_id', zonaIds)
-      .order('data', { ascending: false })
+      .order('data', { ascending: true })
+      .order('id', { ascending: true })
     
     if (dataFiltrar) query = query.lte('data', dataFiltrar)
     
