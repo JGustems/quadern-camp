@@ -1,0 +1,16 @@
+name: Mantenir Supabase actiu
+
+on:
+  schedule:
+    - cron: '0 6 * * 1,4'   # dilluns i dijous a les 6:00 UTC
+  workflow_dispatch:         # permet executar-ho a mà per provar
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consulta a Supabase
+        run: |
+          curl -fsS "${{ secrets.SUPABASE_URL }}/rest/v1/pobles?select=id&limit=1" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}"
